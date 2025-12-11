@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -7,6 +5,7 @@ import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:pinput/pinput.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/presentation/screens/home_screen.dart';
+import 'package:safe_track/presentation/screens/profile_setup_screen.dart';
 import 'package:safe_track/services/auth_services.dart';
 import 'package:safe_track/state/login_provider.dart';
 import 'package:safe_track/state/otp_provider.dart';
@@ -34,7 +33,7 @@ class LoginOtpScreen extends StatelessWidget {
 }
 
 class OtpWidget extends StatelessWidget {
-  OtpWidget({super.key});
+  const OtpWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +171,8 @@ class OtpWidget extends StatelessWidget {
                       otpR.updateOtpStatus(otpStatus.correct);
                       Navigator.pushAndRemoveUntil(
                         context,
-                        MaterialPageRoute(builder: (context) => HomeScreen()),
+                        MaterialPageRoute(builder: (context) => ProfileSetUpScreen()),
+                        (route) => false,
                       );
                     } else {
                       otpR.updateOtpStatus(otpStatus.incorrect);

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:provider/provider.dart';
@@ -153,7 +152,6 @@ class LoginWidget extends StatelessWidget {
         SizedBox(height: 50),
         ElevatedButton(
           onPressed: authW.isLoading ? null : () {
-            print("Pressed button");
             final phone =
                 loginR.getUserNumber().phoneNumber ?? "";
             final valid = loginR.getIsValid();

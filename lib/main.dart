@@ -3,11 +3,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/firebase_options.dart';
-import 'package:safe_track/presentation/screens/login_otp_screen.dart';
-import 'package:safe_track/presentation/screens/login_screen.dart';
+import 'package:safe_track/presentation/screens/home_screen.dart';
 import 'package:safe_track/services/auth_services.dart';
+import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/login_provider.dart';
 import 'package:safe_track/state/otp_provider.dart';
+import 'package:safe_track/state/profile_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => LoginProvider()),
         ChangeNotifierProvider(create: (_) => OtpProvider()),
         ChangeNotifierProvider(create: (_) => AuthServices()),
+        ChangeNotifierProvider(create: (_) => ProfileProvider()),
+        ChangeNotifierProvider(create: (_) => HomeProvider())
       ],
       child: const MyApp(),
     ),
@@ -37,7 +40,7 @@ class MyApp extends StatelessWidget {
       ),
       debugShowCheckedModeBanner: false,
       // home: const MyHomePage(title: 'Flutter Demo Home Page'),
-      home: LoginScreen(),
+      home: HomeScreen(),
     );
   }
 }
