@@ -1,4 +1,6 @@
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
@@ -169,11 +171,48 @@ class OtpWidget extends StatelessWidget {
 
                     if (success) {
                       otpR.updateOtpStatus(otpStatus.correct);
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (context) => ProfileSetUpScreen()),
-                        (route) => false,
-                      );
+                      FirebaseFirestore user = FirebaseFirestore.instance;
+                      CollectionReference ref = user.collection("Users");
+
+                      String Uid = FirebaseAuth.instance.currentUser!.uid;
+
+                      var snap = await ref.doc(Uid).get();
+
+                      if (!snap.exists) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProfileSetUpScreen(),
+                          ),
+                          (route) => false,
+                        );
+                      }else{
+                        var data = snap.data() as Map<String,dynamic> ;
+
+                        if(data.containsKey('profileSet'))
+                          {
+                            if(data['profileSet'])
+                              {
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => HomeScreen()),
+                                      (route) => false,
+                                );
+                              }else{
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(builder: (context) => ProfileSetUpScreen()),
+                                    (route) => false,
+                              );
+                            }
+                          }else{
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => HomeScreen()),
+                                (route) => false,
+                          );
+                        }
+                      }
                     } else {
                       otpR.updateOtpStatus(otpStatus.incorrect);
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -188,7 +227,7 @@ class OtpWidget extends StatelessWidget {
                 },
           style: ElevatedButton.styleFrom(
             elevation: 3,
-            padding: EdgeInsets.only(left: 50,right: 50,top: 10,bottom: 10),
+            padding: EdgeInsets.only(left: 50, right: 50, top: 10, bottom: 10),
             backgroundColor: Colors.purple.shade900,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(15),

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/firebase_options.dart';
 import 'package:safe_track/presentation/screens/home_screen.dart';
+import 'package:safe_track/presentation/screens/profile_setup_screen.dart';
+import 'package:safe_track/presentation/screens/splash_screen.dart';
 import 'package:safe_track/services/auth_services.dart';
 import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/login_provider.dart';
@@ -40,7 +42,7 @@ class MyApp extends StatelessWidget {
       ),
       debugShowCheckedModeBanner: false,
       // home: const MyHomePage(title: 'Flutter Demo Home Page'),
-      home: HomeScreen(),
+      home: SplashScreen(),
     );
   }
 }

@@ -1,14 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/customWidgets/custom_TextField.dart';
+import 'package:safe_track/presentation/screens/home_screen.dart';
 import 'package:safe_track/state/profile_provider.dart';
-
-
 
 // someProblem on this page.. will see it later..... have to implement error red border for
 // all i know how , but is a bit complex...
-
 
 class ProfileSetUpScreen extends StatelessWidget {
   const ProfileSetUpScreen({super.key});
@@ -30,8 +29,15 @@ class ProfileSetUpScreen extends StatelessWidget {
   }
 }
 
-class MainSet extends StatelessWidget {
+class MainSet extends StatefulWidget {
   const MainSet({super.key});
+
+  @override
+  State<MainSet> createState() => _MainSetState();
+}
+
+class _MainSetState extends State<MainSet> {
+  Future<String?>? _saveFuture;
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +78,82 @@ class MainSet extends StatelessWidget {
             SizedBox(height: 100),
           ],
         ),
+        if (_saveFuture != null)
+          Center(
+            child: FutureBuilder<String?>(
+              future: _saveFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: Colors.black),
+                      Text(
+                        "Saving Profile....",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.done) {
+                  if (snapshot.hasError) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: ${snapshot.error}')),
+                      );
+
+                      setState(() {
+                        _saveFuture = null;
+                      });
+                    });
+
+                    return SizedBox.shrink();
+                  }
+
+                  if (snapshot.hasData && snapshot.data != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(snapshot.data!)));
+
+                      setState(() {
+                        _saveFuture = null;
+                      });
+                    });
+
+                    return SizedBox.shrink();
+                  }
+
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Profile Saved SuccessFully.")),
+                    );
+
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => HomeScreen()),
+                      (Route<dynamic> route) => false,
+                    );
+                  });
+
+                  return const SizedBox.shrink();
+                }
+
+                return SizedBox.shrink();
+              },
+            ),
+          ),
         // Floating Complete Button
         Positioned(
           left: 16,
@@ -97,15 +179,30 @@ class MainSet extends StatelessWidget {
             ),
             child: Consumer<ProfileProvider>(
               builder: (ctx, prd, _) {
-
-                final names = prd.getTECNames();
-                final numbers = prd.getTECNumber();
-                final userName = prd.getName();
-                final userEmail = prd.getEmail();
+                // final names = prd.getTECNames();
+                // final numbers = prd.getTECNumber();
+                // final userName = prd.getName();
+                // final userEmail = prd.getEmail();
 
                 return ElevatedButton(
                   onPressed: () async {
+                    // print('Button pressed - starting test write');
+                    // try {
+                    //   await FirebaseFirestore.instance.collection('debug_test').add({'ts': DateTime.now().toIso8601String()});
+                    //   print('Test write success');
+                    //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Test write success')));
+                    // } on FirebaseException catch (e) {
+                    //   print('TEST FirebaseException: code=${e.code} message=${e.message}');
+                    //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.code}')));
+                    // } catch (e, st) {
+                    //   print('TEST Unknown error: $e\n$st');
+                    //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unknown error')));
+                    // }
+
                     // Validation and save logic
+                    setState(() {
+                      _saveFuture = prd.saveProfileData();
+                    });
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
@@ -275,12 +372,12 @@ class EmergencyContacts extends StatefulWidget {
 }
 
 class _EmergencyContacts extends State<EmergencyContacts> {
-  final bool _isVisible = true;
+  bool _isVisible = true;
 
   @override
   Widget build(BuildContext context) {
-    final controllerNames = context.watch<ProfileProvider>().getTECNames();
-    final controllerNumbers = context.watch<ProfileProvider>().getTECNumber();
+    // final controllerNames = context.watch<ProfileProvider>().getTECNames();
+    // final controllerNumbers = context.watch<ProfileProvider>().getTECNumber();
 
     return AnimatedSize(
       duration: const Duration(milliseconds: 350),
@@ -355,7 +452,9 @@ class _EmergencyContacts extends State<EmergencyContacts> {
                                 radius: 10,
                                 filled: true,
                                 filledColor: Colors.white,
-                                tec: controllerNames[widget.index],
+                                tec: context
+                                    .watch<ProfileProvider>()
+                                    .getTECNames()[widget.index],
                                 fW: FontWeight.w500,
                                 paddingHorizontal: 5,
                                 enabledColorBorder: Colors.white,
@@ -374,7 +473,9 @@ class _EmergencyContacts extends State<EmergencyContacts> {
                                 filled: true,
                                 fW: FontWeight.w500,
                                 filledColor: Colors.white,
-                                tec: controllerNumbers[widget.index],
+                                tec: context
+                                    .watch<ProfileProvider>()
+                                    .getTECNumber()[widget.index],
                                 keyboard: TextInputType.phone,
                                 paddingHorizontal: 5,
                                 enabledColorBorder: Color(0xFFE5E7EB),
@@ -386,15 +487,45 @@ class _EmergencyContacts extends State<EmergencyContacts> {
                       ),
                       SizedBox(width: 8),
                       // Delete Button
-                      Container(
-                        width: 35,
-                        height: 35,
-                        margin: EdgeInsets.only(top: 4),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFFEE2E2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        // child: Consumer<ProfileProvider>(),
+                      // Container(
+                      //   width: 35,
+                      //   height: 35,
+                      //   margin: EdgeInsets.only(top: 4),
+                      //   decoration: BoxDecoration(
+                      //     color: Color(0xFFFEE2E2),
+                      //     borderRadius: BorderRadius.circular(10),
+                      //   ),
+                      //   child: Consumer<ProfileProvider>(),
+                      // ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              _isVisible = false;
+                              int idx = widget.index;
+                              setState(() {});
+                              Future.delayed(Duration(milliseconds: 300), () {
+                                if (mounted) {
+                                  context
+                                      .read<ProfileProvider>()
+                                      .updateRemoveTEC(idx);
+                                  setState(() {});
+                                }
+                              });
+                            },
+                            icon: SvgPicture.asset(
+                              'assets/images/delete.svg',
+                              width: 20,
+                              height: 20,
+                              colorFilter: ColorFilter.mode(
+                                Color(0xFFEF4444),
+                                BlendMode.srcIn,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -435,14 +566,14 @@ class _Contacts extends State<Contacts> {
     // final controllerNames = context.watch<ProfileProvider>().getTECNames();
 
     return Card(
-      elevation: 1,
+      elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
         side: BorderSide(color: Colors.white.withOpacity(0.8), width: 1),
       ),
       color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.only(left: 10, right: 10, top: 20, bottom: 5),
         child: Column(
           children: [
             // Header Row
@@ -474,7 +605,7 @@ class _Contacts extends State<Contacts> {
                             "Emergency Contacts",
                             style: TextStyle(
                               color: Color(0xFF1F2937),
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -545,7 +676,7 @@ class _Contacts extends State<Contacts> {
                 SizedBox(width: 4),
               ],
             ),
-            SizedBox(height: 20),
+            SizedBox(height: 10),
             // Contacts List or Empty State
             Consumer<ProfileProvider>(
               builder: (_, provider, _) {

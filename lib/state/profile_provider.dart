@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import 'package:safe_track/presentation/screens/profile_setup_screen.dart';
@@ -21,10 +24,9 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void modifyErrorList(int idx, bool error)
-  {
+  void modifyErrorList(int idx, bool error) {
     final old = _errorList[idx];
-    _errorList[idx] = (isError: error,node: old.node);
+    _errorList[idx] = (isError: error, node: old.node);
 
     notifyListeners();
   }
@@ -55,6 +57,7 @@ class ProfileProvider extends ChangeNotifier {
   void updateAddTEC(TextEditingController tec, TextEditingController tec2) {
     _contactNames.add(tec);
     _contactNumbers.add(tec2);
+
     notifyListeners();
   }
 
@@ -84,8 +87,78 @@ class ProfileProvider extends ChangeNotifier {
   //   notifyListeners();
   // }
 
-  Future<void> saveProfileData() async {
-    //Will write function for what will happen upon clicking this buttton
+  String ordinal(int n) {
+    if (n == 1) return "st";
+    if (n == 2) return "nd";
+    if (n == 3) return "rd";
+    return "th";
+  }
+
+  Future<String?> saveProfileData() async {
+
+    // try {
+    //   print('saveProfileData called. Firebase apps: ${Firebase.apps}');
+    // } catch (_) {}
+
+    final name = _name.text.trim();
+    // final email = _email.text.trim();
+
+    FirebaseFirestore users = FirebaseFirestore.instance;
+
+    CollectionReference ref = users.collection('Users');
+
+    if (name.isEmpty) {
+      return 'Name is Empty';
+    }
+
+    if (_contactNames.length < 2 || _contactNumbers.length <2) {
+      return 'Need Atleast 2 Emergency Contacts.';
+    }
+
+    if (_contactNames.length != _contactNumbers.length) {
+      return 'Internal error: contact name/number lists are inconsistent.';
+    }
+
+    for (var i = 0; i < _contactNames.length; i++) {
+      if (_contactNames[i].text.trim().isEmpty) {
+        return 'Name Field for ${i + 1}${ordinal(i + 1)} Contact is Empty.';
+      }
+
+      if (_contactNumbers[i].text.trim().isEmpty) {
+        return 'Phone Number Field for ${i + 1}${ordinal(i + 1)} Contact is Empty.';
+      }
+    }
+
+    // for (var i = 0; i < _contactNumbers.length; i++) {
+    //   if (_contactNumbers[i].text.trim().isEmpty) {
+    //     return 'Phone Number Field for ${i + 1}${ordinal(i + 1)} Contact is Empty.';
+    //   }
+    // }
+
+    final List<Map<String, dynamic>> _contact = [];
+
+    for(int i =0;i<_contactNames.length;i++)
+      {
+        _contact.add({'name': _contactNames[i].text.toString(), 'phone': _contactNumbers[i].text});
+      }
+
+    print("FINAL CONTACT LIST BEFORE FIRESTORE: $_contact");
+
+    try {
+      String uid = FirebaseAuth.instance.currentUser!.uid;
+      await ref.doc(uid).set({
+        'fullName': _name.text,
+        'email': _email.text,
+        'contact_list': _contact,
+        'profileSet' : true
+      });
+
+      return null;
+    } catch (e,st) {
+      print('Firestore error: $e');
+      print(st);
+      return 'Failed To upload.\nError : ${e}';
+    }
   }
 
   @override
