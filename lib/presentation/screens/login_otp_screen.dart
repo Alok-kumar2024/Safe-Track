@@ -8,9 +8,12 @@ import 'package:pinput/pinput.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/presentation/screens/home_screen.dart';
 import 'package:safe_track/presentation/screens/profile_setup_screen.dart';
+import 'package:safe_track/presentation/screens/splash_screen.dart';
 import 'package:safe_track/services/auth_services.dart';
 import 'package:safe_track/state/login_provider.dart';
 import 'package:safe_track/state/otp_provider.dart';
+
+import '../../state/profile_provider.dart';
 
 class LoginOtpScreen extends StatelessWidget {
   const LoginOtpScreen({super.key});
@@ -171,48 +174,69 @@ class OtpWidget extends StatelessWidget {
 
                     if (success) {
                       otpR.updateOtpStatus(otpStatus.correct);
-                      FirebaseFirestore user = FirebaseFirestore.instance;
-                      CollectionReference ref = user.collection("Users");
 
-                      String Uid = FirebaseAuth.instance.currentUser!.uid;
+                      final profileProvider = context.read<ProfileProvider>();
 
-                      var snap = await ref.doc(Uid).get();
+                      await profileProvider.init();
 
-                      if (!snap.exists) {
+                      if (!context.mounted) return;
+
+                      if (profileProvider.isProfileSet) {
                         Navigator.pushAndRemoveUntil(
                           context,
-                          MaterialPageRoute(
-                            builder: (context) => ProfileSetUpScreen(),
-                          ),
-                          (route) => false,
+                          MaterialPageRoute(builder: (_) => HomeScreen()),
+                              (route) => false,
                         );
-                      }else{
-                        var data = snap.data() as Map<String,dynamic> ;
-
-                        if(data.containsKey('profileSet'))
-                          {
-                            if(data['profileSet'])
-                              {
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => HomeScreen()),
-                                      (route) => false,
-                                );
-                              }else{
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(builder: (context) => ProfileSetUpScreen()),
-                                    (route) => false,
-                              );
-                            }
-                          }else{
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (context) => HomeScreen()),
-                                (route) => false,
-                          );
-                        }
+                      } else {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => ProfileSetUpScreen()),
+                              (route) => false,
+                        );
                       }
+
+                      // FirebaseFirestore user = FirebaseFirestore.instance;
+                      // CollectionReference ref = user.collection("Users");
+                      //
+                      // String Uid = FirebaseAuth.instance.currentUser!.uid;
+                      //
+                      // var snap = await ref.doc(Uid).get();
+                      //
+                      // if (!snap.exists) {
+                      //   Navigator.pushAndRemoveUntil(
+                      //     context,
+                      //     MaterialPageRoute(
+                      //       builder: (context) => ProfileSetUpScreen(),
+                      //     ),
+                      //     (route) => false,
+                      //   );
+                      // }else{
+                      //   var data = snap.data() as Map<String,dynamic> ;
+                      //
+                      //   if(data.containsKey('profileSet'))
+                      //     {
+                      //       if(data['profileSet'])
+                      //         {
+                      //           Navigator.pushAndRemoveUntil(
+                      //             context,
+                      //             MaterialPageRoute(builder: (context) => HomeScreen()),
+                      //                 (route) => false,
+                      //           );
+                      //         }else{
+                      //         Navigator.pushAndRemoveUntil(
+                      //           context,
+                      //           MaterialPageRoute(builder: (context) => ProfileSetUpScreen()),
+                      //               (route) => false,
+                      //         );
+                      //       }
+                      //     }else{
+                      //     Navigator.pushAndRemoveUntil(
+                      //       context,
+                      //       MaterialPageRoute(builder: (context) => HomeScreen()),
+                      //           (route) => false,
+                      //     );
+                      //   }
+                      // }
                     } else {
                       otpR.updateOtpStatus(otpStatus.incorrect);
                       ScaffoldMessenger.of(context).showSnackBar(

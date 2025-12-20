@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
 import 'package:safe_track/presentation/screens/profile_setup_screen.dart';
 
@@ -61,6 +62,20 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void debugPrintHiveData() {
+    if (!_isHiveReady) {
+      debugPrint('Hive not initialized');
+      return;
+    }
+
+    debugPrint('----- HIVE DATA -----');
+    for (var key in _userBox.keys) {
+      debugPrint('$key : ${_userBox.get(key)}');
+    }
+    debugPrint('---------------------');
+  }
+
+
   void updateRemoveTEC(int value) {
     //Disposing the TextEditingControllers....
     _contactNames[value].dispose();
@@ -74,18 +89,18 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  //Contact number
+  List<String> getEmergencyNumbers() {
+    return _contactNumbers.map((c) => c.text).toList();
+  }
 
-  // void updateAddTECNumbers(TextEditingController tec) {
-  //   _contactNumbers.add(tec);
-  //
-  //   notifyListeners();
-  // }
+  late Box _userBox; // Hive storage box
+  bool _isHiveReady = false; // Safety flag
+  bool _profileLoaded = false;
 
-  // void updateRemoveTECNumbers(int value) {
-  //   _contactNumbers.removeAt(value);
-  //   notifyListeners();
-  // }
+  bool get isProfileSet {
+    if (!_isHiveReady) return false;
+    return _userBox.get('profileSet', defaultValue: false);
+  }
 
   String ordinal(int n) {
     if (n == 1) return "st";
@@ -94,8 +109,85 @@ class ProfileProvider extends ChangeNotifier {
     return "th";
   }
 
-  Future<String?> saveProfileData() async {
+  Future<void> init() async {
 
+    if (_isHiveReady) return;
+
+    _userBox = await Hive.openBox('userBox'); // Opens or creates box
+    _isHiveReady = true;
+
+    await _loadProfile(); // decides Hive or Firestore
+  }
+
+  Future<void> _loadProfile() async {
+    if (_profileLoaded) return;
+    _profileLoaded = true;
+
+    // 1️⃣ Try loading from Hive
+    final bool profileSet = _userBox.get('profileSet', defaultValue: false);
+
+    if (profileSet) {
+      _loadFromHive();
+      return;
+    }
+
+    // 2️⃣ If Hive empty, try Firebase
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('Users')
+        .doc(user.uid)
+        .get();
+
+    if (!doc.exists) return;
+
+    _loadFromFirestore(doc.data()!);
+  }
+
+  void _loadFromHive() {
+    _name.text = _userBox.get('fullName', defaultValue: '');
+    _email.text = _userBox.get('email', defaultValue: '');
+
+    final List<dynamic> contacts =
+    _userBox.get('emergency_contacts', defaultValue: []);
+
+    _contactNames.clear();
+    _contactNumbers.clear();
+
+    for (final c in contacts) {
+      _contactNames.add(TextEditingController(text: c['name']));
+      _contactNumbers.add(TextEditingController(text: c['phone']));
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> _loadFromFirestore(Map<String, dynamic> data) async {
+    _name.text = data['fullName'] ?? '';
+    _email.text = data['email'] ?? '';
+
+    final List contacts = data['contact_list'] ?? [];
+
+    _contactNames.clear();
+    _contactNumbers.clear();
+
+    for (final c in contacts) {
+      _contactNames.add(TextEditingController(text: c['name']));
+      _contactNumbers.add(TextEditingController(text: c['phone']));
+    }
+
+    // 🔥 SAVE RESTORED DATA TO HIVE
+    await _userBox.put('fullName', _name.text);
+    await _userBox.put('email', _email.text);
+    await _userBox.put('emergency_contacts', contacts);
+    await _userBox.put('profileSet', true);
+
+    notifyListeners();
+  }
+
+
+  Future<String?> saveProfileData() async {
     // try {
     //   print('saveProfileData called. Firebase apps: ${Firebase.apps}');
     // } catch (_) {}
@@ -111,7 +203,7 @@ class ProfileProvider extends ChangeNotifier {
       return 'Name is Empty';
     }
 
-    if (_contactNames.length < 2 || _contactNumbers.length <2) {
+    if (_contactNames.length < 2 || _contactNumbers.length < 2) {
       return 'Need Atleast 2 Emergency Contacts.';
     }
 
@@ -137,10 +229,19 @@ class ProfileProvider extends ChangeNotifier {
 
     final List<Map<String, dynamic>> _contact = [];
 
-    for(int i =0;i<_contactNames.length;i++)
-      {
-        _contact.add({'name': _contactNames[i].text.toString(), 'phone': _contactNumbers[i].text});
-      }
+    for (int i = 0; i < _contactNames.length; i++) {
+      _contact.add({
+        'name': _contactNames[i].text.toString(),
+        'phone': _contactNumbers[i].text,
+      });
+    }
+    // 🔒 SAVE TO HIVE FIRST (OFFLINE)
+    if (_isHiveReady) {
+      await _userBox.put('fullName', _name.text);
+      await _userBox.put('email', _email.text);
+      await _userBox.put('emergency_contacts', _contact);
+      await _userBox.put('profileSet', true);
+    }
 
     print("FINAL CONTACT LIST BEFORE FIRESTORE: $_contact");
 
@@ -150,14 +251,14 @@ class ProfileProvider extends ChangeNotifier {
         'fullName': _name.text,
         'email': _email.text,
         'contact_list': _contact,
-        'profileSet' : true
+        'profileSet': true,
       });
 
       return null;
-    } catch (e,st) {
+    } catch (e, st) {
       print('Firestore error: $e');
       print(st);
-      return 'Failed To upload.\nError : ${e}';
+      return 'Failed To upload.\nError : $e';
     }
   }
 

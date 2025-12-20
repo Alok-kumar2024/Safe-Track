@@ -22,8 +22,7 @@ class AuthServices extends ChangeNotifier {
 
   int get secondRemaining => _secondRemaining;
 
-  void updateLoading(bool loading)
-  {
+  void updateLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
