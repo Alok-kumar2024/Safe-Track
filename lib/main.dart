@@ -13,6 +13,7 @@ import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/login_provider.dart';
 import 'package:safe_track/state/otp_provider.dart';
 import 'package:safe_track/state/profile_provider.dart';
+import 'package:safe_track/state/sos_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +35,13 @@ void main() async {
             return profile;
           },
         ),
-        ChangeNotifierProvider(create: (_) => HomeProvider()),
+        ChangeNotifierProvider(create: (_)
+        {
+          final home = HomeProvider();
+          home.init();
+          return home;
+        }),
+        ChangeNotifierProvider(create: (_) => SosProvider()),
       ],
       child: const MyApp(),
     ),

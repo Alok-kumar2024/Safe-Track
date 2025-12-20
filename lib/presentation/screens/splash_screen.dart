@@ -10,6 +10,7 @@ import 'package:safe_track/colors/app_colors.dart';
 import 'package:safe_track/presentation/screens/login_screen.dart';
 import 'package:safe_track/presentation/screens/profile_setup_screen.dart';
 
+import '../../state/home_provider.dart';
 import '../../state/profile_provider.dart';
 import 'home_screen.dart';
 
@@ -45,6 +46,10 @@ class _SplashScreenState extends State<SplashScreen>
     await profileProvider.init(); // 🔥 Hive + Firestore restore
 
     profileProvider.debugPrintHiveData();
+
+    final homeProvider = context.read<HomeProvider>();
+    await homeProvider.init();
+
 
     if (!mounted) return;
 

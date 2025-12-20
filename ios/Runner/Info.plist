@@ -52,6 +52,12 @@
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Location is needed for SOS alerts</string>
 
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>sms</string>
+        <string>tel</string>
+    </array>
+
 
 </dict>
 </plist>

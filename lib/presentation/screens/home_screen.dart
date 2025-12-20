@@ -2,8 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
+import 'package:safe_track/services/shake_services.dart';
 import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/profile_provider.dart';
+import 'package:safe_track/state/sos_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,6 +16,28 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const double topBarHeight = 150.0;
+
+  late ShakeServices _shakeServices;
+
+  @override
+  void initState()
+  {
+    super.initState();
+
+    _shakeServices = ShakeServices();
+
+    WidgetsBinding.instance.addPostFrameCallback((_){
+      final homeProvider = context.read<HomeProvider>();
+
+      if(homeProvider.getShakeValue())
+        {
+          _shakeServices.startShakeListening(() async {
+            await context.read<SosProvider>().triggerSos(context);
+          });
+        }
+    });
+
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +116,15 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  @override
+  void dispose()
+  {
+    _shakeServices.stopShakeListening();
+    super.dispose();
+
+  }
+
 }
 
 class TopBar extends StatelessWidget {
@@ -124,7 +157,9 @@ class TopBar extends StatelessWidget {
                   Consumer<ProfileProvider>(
                     builder: (_, prd, _) {
                       return Text(
-                        "Hi, ${prd.getName().text}! 👋",
+                        "Hi, ${prd
+                            .getName()
+                            .text}! 👋",
                         style: TextStyle(
                           color: Colors.black,
                           fontSize: 22,
@@ -186,53 +221,94 @@ class Sos extends StatelessWidget {
               padding: const EdgeInsets.only(top: 20, bottom: 20),
               child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      print("clicked");
-                      //Will write in futur
-                    },
-                    child: Container(
-                      width: 192,
-                      height: 192,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0xFFEF4444), // Red-500
-                            Color(0xFFEC4899), // Pink-600
-                          ],
-                          // begin: Alignment.topLeft,
-                          // end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x40EF4444), // 25% Red
-                            blurRadius: 40,
-                            offset: Offset(0, 10),
-                          ),
-                        ],
-                      ),
+                  Consumer<SosProvider>(
+                    builder: (ctx, provider, child) {
+                      return GestureDetector(
+                        // 1. Logic: If sending, disable click (null)
+                        onTap: provider.isSending ? null : () async {
+                          debugPrint("clicked");
 
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline_outlined,
-                            color: Colors.white,
-                            size: 80,
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            "SOS",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontWeight: FontWeight.w900,
+                          // 2. Trigger SOS using 'ctx'
+                          bool? result = await provider.triggerSos(ctx);
+
+                          // 3. SAFETY CHECK (Crucial for async code)
+                          // If the user closed the screen while SOS was sending, 'ctx' is dead.
+                          // We must check if it's still mounted before using it.
+                          if (!ctx.mounted) return;
+
+                          // 4. Handle Result
+                          if (result == null) return; // Busy/Double click
+
+                          if (result == true) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text("🚨 SOS Sent!"),
+                                  backgroundColor: Colors.green,
+                                ));
+                          } else {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text("❌ Failed to send SOS."),
+                                  backgroundColor: Colors.red,
+                                ));
+                          }
+                        },
+                        child: Container(
+                          width: 192,
+                          height: 192,
+                          decoration: BoxDecoration(
+                            // 5. VISUAL FEEDBACK: Change color if busy
+                            // If you don't do this, the button stays Red but does nothing when tapped.
+                            gradient: provider.isSending
+                                ? LinearGradient(colors: [
+                              Colors.grey.shade400,
+                              Colors.grey.shade600
+                            ])
+                                : const LinearGradient(
+                              colors: [
+                                Color(0xFFEF4444), // Red
+                                Color(0xFFEC4899), // Pink
+                              ],
                             ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              // Remove shadow when disabled to look "flat"
+                              provider.isSending
+                                  ? const BoxShadow(color: Colors.transparent)
+                                  : const BoxShadow(
+                                color: Color(0x40EF4444),
+                                blurRadius: 40,
+                                offset: Offset(0, 10),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
+
+                          // 6. Show Spinner if sending, otherwise show Icon+Text
+                          child: provider.isSending
+                              ? const Center(child: CircularProgressIndicator(
+                              color: Colors.white))
+                              : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.error_outline_outlined,
+                                color: Colors.white,
+                                size: 80,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                "SOS",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
 
                   SizedBox(height: 30),
@@ -438,7 +514,23 @@ class ShakeDetection extends StatelessWidget {
               inactiveTrackColor: Colors.grey.shade300,
               onChanged: (value) {
                 //Will set Later
-                context.read<HomeProvider>().updateShake(value);
+                final homeProvider = context.read<HomeProvider>();
+                final sosProvider = context.read<SosProvider>();
+
+                homeProvider.updateShake(value);
+
+                final homeState =
+                context.findAncestorStateOfType<_HomeScreenState>();
+
+                if (homeState == null) return;
+
+                if (value) {
+                  homeState._shakeServices.startShakeListening(() async {
+                    await sosProvider.triggerSos(context);
+                  });
+                } else {
+                  homeState._shakeServices.stopShakeListening();
+                }
               },
             ),
           ],
