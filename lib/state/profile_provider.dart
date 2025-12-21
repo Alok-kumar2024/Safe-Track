@@ -12,6 +12,11 @@ class ProfileProvider extends ChangeNotifier {
   final TextEditingController _name = TextEditingController();
   final TextEditingController _email = TextEditingController();
 
+  String? _emergencyCallNumber;
+
+  String? get emergencyCallNumber => _emergencyCallNumber;
+
+
   TextEditingController get nameController => _name;
 
   TextEditingController get emailController => _email;
@@ -92,8 +97,24 @@ class ProfileProvider extends ChangeNotifier {
         .map((e) => EmergencyContact.fromMap(Map<String, dynamic>.from(e)))
         .toList();
 
+    _emergencyCallNumber = _userBox.get(
+      'emergency_call_number',
+      defaultValue: null,
+    );
+
     notifyListeners();
   }
+
+  Future<void> setEmergencyCallNumber(String number) async {
+    _emergencyCallNumber = number;
+
+    if (_isHiveReady) {
+      await _userBox.put('emergency_call_number', number);
+    }
+
+    notifyListeners();
+  }
+
 
   // ===============================
   // LOAD FROM FIRESTORE
@@ -103,14 +124,16 @@ class ProfileProvider extends ChangeNotifier {
     _email.text = data['email'] ?? '';
 
     final List raw = data['contact_list'] ?? [];
-
     _contacts = raw
         .map((e) => EmergencyContact.fromMap(Map<String, dynamic>.from(e)))
         .toList();
 
+    _emergencyCallNumber = data['emergency_call_number']; // ✅ ADD
+
     await _persistToHive();
     notifyListeners();
   }
+
 
   // ===============================
   // SAVE PROFILE (SETUP SCREEN)
@@ -136,8 +159,10 @@ class ProfileProvider extends ChangeNotifier {
         'fullName': _name.text,
         'email': _email.text,
         'contact_list': _contacts.map((e) => e.toMap()).toList(),
+        'emergency_call_number': _emergencyCallNumber,
         'profileSet': true,
       });
+
 
       return null;
     } catch (e) {
@@ -208,6 +233,7 @@ class ProfileProvider extends ChangeNotifier {
     _email.clear();
 
     if (_isHiveReady) {
+      await _userBox.delete('emergency_call_number');
       await _userBox.clear();
     }
 

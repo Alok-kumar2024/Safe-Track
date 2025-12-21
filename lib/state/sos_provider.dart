@@ -1,15 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/presentation/model/sos_history.dart';
 import 'package:safe_track/services/location_service.dart';
 import 'package:safe_track/services/sms_service.dart';
 import 'package:safe_track/services/sos_feedback_service.dart';
-import 'package:safe_track/services/sos_history_storage_service.dart';
 import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/profile_provider.dart';
 import 'package:safe_track/state/sos_history_provider.dart';
-
-import '../presentation/model/emergency_contact.dart';
+import '../services/emergency_call_service.dart';
 
 class SosProvider extends ChangeNotifier {
   bool _sending = false;
@@ -20,90 +19,107 @@ class SosProvider extends ChangeNotifier {
   final SmsService _smsService = SmsService();
   final SosFeedBackService _feedbackService = SosFeedBackService();
 
-  Future<bool?> triggerSos(BuildContext context,
-      {String trigger = 'button'}) async {
-    // 1. Prevent double triggers
+  Future<bool?> triggerSos(
+      BuildContext context, {
+        String trigger = 'button',
+      }) async {
+    /// 1️⃣ Prevent double trigger
     if (_sending) return null;
     _sending = true;
     notifyListeners();
 
     final homeProvider = context.read<HomeProvider>();
+    final profileProvider = context.read<ProfileProvider>();
 
-    // 2. Immediate Haptic Feedback (Vibration)
-    // Confirms "Button Pressed" immediately to the user
+    /// 2️⃣ Instant feedback (vibration)
     await _feedbackService.vibrate();
 
     bool success = false;
-    String locationMessage = 'Location not available (GPS disabled or denied)';
+    String locationMessage =
+        'Location not available (GPS disabled or permission denied)';
     String address = 'Unknown location';
 
     try {
-      // 3. Get Contacts
-      final profileProvider = context.read<ProfileProvider>();
-      final contacts = profileProvider.getEmergencyNumbers();
+      /// 3️⃣ Get SOS data
+      final smsContacts = profileProvider.getEmergencyNumbers();
+      final callNumber = profileProvider.emergencyCallNumber;
 
-      if (contacts.isEmpty) {
-        debugPrint('No contacts found');
+      /// ❌ Nothing configured → STOP
+      if (smsContacts.isEmpty &&
+          (callNumber == null || callNumber.isEmpty)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "No emergency contacts or call number set. Please configure SOS settings.",
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        success = false;
         return false;
       }
 
-      // 4. Get Location (Safe block)
+      /// 4️⃣ Try to get location (safe)
       try {
         final position = await _locationService.getCurrentLocation();
 
-        final String link = _locationService.getGoogleMapsLink(
-            position.latitude,
-            position.longitude
+        locationMessage = _locationService.getGoogleMapsLink(
+          position.latitude,
+          position.longitude,
         );
-        locationMessage = link;
 
         address = await _locationService.getAddressFromPosition(position);
-
       } catch (e) {
-        // Location failed, but we continue with SMS
         debugPrint('Location failed: $e');
       }
 
-      // 5. Prepare Message
+      /// 5️⃣ Compose SOS message
       final sosMessage =
           '🚨 EMERGENCY ALERT 🚨\n\n'
           'I am in danger and need help immediately.\n\n'
           '📍 Location:\n$address\n\n'
-          'My current location:\n$locationMessage';
+          '🗺️ Live Location:\n$locationMessage';
 
-      // 6. Send SMS
-      await _smsService.sendSms(
-          recipients: contacts,
-          message: sosMessage
-      );
+      /// 6️⃣ Send SMS (ONLY if contacts exist)
+      if (smsContacts.isNotEmpty) {
+        await _smsService.sendSms(
+          recipients: smsContacts,
+          message: sosMessage,
+        );
+      }
 
-      // 7. Play Sound ONLY on success
-      // Moved here so it confirms the action worked.
-      if(homeProvider.isSosSoundEnabled) {
+      /// 7️⃣ Play siren (only if enabled)
+      if (homeProvider.isSosSoundEnabled) {
         await _feedbackService.playAlertSound();
+      }
+
+      /// 8️⃣ Make emergency call (ONLY if number exists)
+      if (callNumber != null && callNumber.isNotEmpty) {
+        final callService = EmergencyCallService();
+        await callService.call(callNumber);
       }
 
       success = true;
       return true;
-
     } catch (e) {
-      success = false;
       debugPrint('SOS failed: $e');
+      success = false;
       return false;
     } finally {
-
-      // 8. Save History
-      // Added mounted check to be safe
+      /// 9️⃣ Save SOS history (always)
       if (context.mounted) {
         final historyProvider = context.read<SosHistoryProvider>();
 
-        await historyProvider.addHistory(SosHistory(
+        await historyProvider.addHistory(
+          SosHistory(
             time: DateTime.now(),
             locationText: locationMessage,
             address: address,
             success: success,
-            trigger: trigger
-        ));
+            trigger: trigger,
+          ),
+        );
       }
 
       _sending = false;

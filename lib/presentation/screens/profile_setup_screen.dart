@@ -15,9 +15,10 @@ class ProfileSetUpScreen extends StatefulWidget {
 class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
   final List<TextEditingController> _nameControllers = [];
   final List<TextEditingController> _phoneControllers = [];
+  final TextEditingController _emergencyCallController = TextEditingController();
 
   bool _saving = false;
-  int _currentStep = 0; // 0 = personal info, 1 = emergency contacts
+  int _currentStep = 0; // 0 = personal, 1 = emergency
 
   // Premium Color Palette
   static const primaryColor = Color(0xFF6366F1); // Indigo
@@ -28,7 +29,6 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
   @override
   void initState() {
     super.initState();
-    // Minimum 2 contacts required
     _addContact();
     _addContact();
   }
@@ -46,7 +46,6 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
       return;
     }
 
-    // Dispose controllers before removing
     _nameControllers[index].dispose();
     _phoneControllers[index].dispose();
 
@@ -64,16 +63,25 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
 
     final provider = context.read<ProfileProvider>();
     final name = provider.nameController.text.trim();
+    final emergencyCall = _emergencyCallController.text.trim();
 
     if (name.isEmpty) {
-      _showSnackBar("Please enter your full name", isError: true);
-      setState(() => _saving = false);
+      _fail("Please enter your full name");
+      return;
+    }
+
+    if (emergencyCall.isEmpty) {
+      _fail("Emergency call number is required");
+      return;
+    }
+
+    if (emergencyCall.length < 10) {
+      _fail("Please enter a valid emergency number");
       return;
     }
 
     if (_nameControllers.length < 2) {
-      _showSnackBar("Add at least 2 emergency contacts", isError: true);
-      setState(() => _saving = false);
+      _fail("Add at least 2 emergency contacts");
       return;
     }
 
@@ -84,13 +92,14 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
       final phone = _phoneControllers[i].text.trim();
 
       if (cname.isEmpty || phone.isEmpty) {
-        _showSnackBar("All emergency contact fields must be filled", isError: true);
-        setState(() => _saving = false);
+        _fail("All emergency contact fields must be filled");
         return;
       }
 
       contacts.add(EmergencyContact(name: cname, phone: phone));
     }
+
+    await provider.setEmergencyCallNumber(emergencyCall);
 
     final error = await provider.saveProfileData();
 
@@ -108,6 +117,11 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
       MaterialPageRoute(builder: (_) => const HomeScreen()),
           (_) => false,
     );
+  }
+
+  void _fail(String msg) {
+    setState(() => _saving = false);
+    _showSnackBar(msg, isError: true);
   }
 
   void _showSnackBar(String msg, {required bool isError}) {
@@ -145,12 +159,9 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
 
   @override
   void dispose() {
-    for (final c in _nameControllers) {
-      c.dispose();
-    }
-    for (final c in _phoneControllers) {
-      c.dispose();
-    }
+    _emergencyCallController.dispose();
+    for (final c in _nameControllers) c.dispose();
+    for (final c in _phoneControllers) c.dispose();
     super.dispose();
   }
 
@@ -159,8 +170,6 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
     final provider = context.watch<ProfileProvider>();
 
     return Scaffold(
-      // This ensures the layout adjusts when keyboard opens
-      resizeToAvoidBottomInset: true,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -212,27 +221,23 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
                 ),
               ),
             ),
-
-            // Main Content Area
+            // Main content
             SafeArea(
-              // FIX: Used a single ListView for the entire page to handle scrolling
-              // and keyboard avoidance gracefully.
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.zero,
+              child: Column(
                 children: [
                   _buildHeader(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
+                  Expanded(
+                    child: ListView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                       children: [
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 30),
                         _buildPersonalInfoSection(provider),
-                        const SizedBox(height: 40),
-                        _buildEmergencyContactsSection(),
+                        const SizedBox(height: 24),
+                        _buildEmergencySection(),
                         const SizedBox(height: 40),
                         _buildSaveButton(),
-                        const SizedBox(height: 40), // Bottom breathing room
+                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
@@ -250,7 +255,6 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
       padding: const EdgeInsets.all(28),
       child: Column(
         children: [
-          // Icon & Title
           Row(
             children: [
               Container(
@@ -302,7 +306,7 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Just a few more details to get started",
+                      "Setup your safety network",
                       style: TextStyle(
                         fontSize: 14,
                         color: textSecondaryColor,
@@ -314,7 +318,6 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          // Progress indicator
           _buildProgressIndicator(),
         ],
       ),
@@ -356,7 +359,7 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
               ),
             ),
           ),
-          _buildStepIndicator(1, "Contacts", false),
+          _buildStepIndicator(1, "Emergency", false),
         ],
       ),
     );
@@ -463,34 +466,7 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
     );
   }
 
-  Widget _buildInputLabel(String label, {required bool required}) {
-    return Row(
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: textSecondaryColor.withOpacity(0.7),
-            letterSpacing: 1.2,
-          ),
-        ),
-        if (required) ...[
-          const SizedBox(width: 4),
-          Text(
-            "*",
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFFEF4444),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildEmergencyContactsSection() {
+  Widget _buildEmergencySection() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -512,40 +488,126 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // FIX: Wrapped in Flexible/Expanded to prevent text pushing button off screen
-              Flexible(
-                child: Row(
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.emergency_rounded,
+                  size: 20,
+                  color: Color(0xFFEF4444),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Emergency Setup",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Emergency Call Number Section
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFEF4444).withOpacity(0.08),
+                  const Color(0xFFFCA5A5).withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFEF4444).withOpacity(0.2),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.contact_emergency_rounded,
-                        size: 20,
-                        color: Color(0xFFEF4444),
+                        Icons.call_rounded,
+                        color: Colors.white,
+                        size: 16,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    const Flexible(
-                      child: Text(
-                        "Emergency Contacts",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: textPrimaryColor,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 10),
+                    const Text(
+                      "Emergency Call Number",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: Color(0xFFDC2626),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  "This number will be called automatically during SOS",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: const Color(0xFFDC2626).withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                CustomTextField(
+                  hint: "Primary emergency number",
+                  keyboard: TextInputType.phone,
+                  tec: _emergencyCallController,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Emergency Contacts Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.contact_emergency_rounded,
+                      size: 18,
+                      color: primaryColor,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    "Emergency Contacts",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimaryColor,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
               Container(
                 decoration: BoxDecoration(
                   color: primaryColor.withOpacity(0.1),
@@ -565,7 +627,9 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 12),
+
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -597,18 +661,16 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          // FIX: Replaced ListView with Column and spread operator
-          // This allows it to exist inside the parent ListView without conflict
-          Column(
-            children: [
-              for (int i = 0; i < _nameControllers.length; i++)
-                Padding(
-                  padding: EdgeInsets.only(
-                      bottom: i == _nameControllers.length - 1 ? 0 : 16),
-                  child: _buildContactCard(i),
-                ),
-            ],
+
+          const SizedBox(height: 16),
+
+          // Contacts List
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _nameControllers.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (_, index) => _buildContactCard(index),
           ),
         ],
       ),
@@ -705,6 +767,33 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInputLabel(String label, {required bool required}) {
+    return Row(
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: textSecondaryColor.withOpacity(0.7),
+            letterSpacing: 1.2,
+          ),
+        ),
+        if (required) ...[
+          const SizedBox(width: 4),
+          Text(
+            "*",
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFEF4444),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
