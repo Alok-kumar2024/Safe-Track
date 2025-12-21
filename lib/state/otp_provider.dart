@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum otpStatus {idle , correct , incorrect}
+enum otpStatus {idle , correct , incorrect, none}
 
 class OtpProvider extends ChangeNotifier {
 

@@ -1,743 +1,785 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/customWidgets/custom_TextField.dart';
 import 'package:safe_track/presentation/screens/home_screen.dart';
 import 'package:safe_track/state/profile_provider.dart';
+import '../../presentation/model/emergency_contact.dart';
 
-// someProblem on this page.. will see it later..... have to implement error red border for
-// all i know how , but is a bit complex...
-
-class ProfileSetUpScreen extends StatelessWidget {
+class ProfileSetUpScreen extends StatefulWidget {
   const ProfileSetUpScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFAF5FF), Color(0xFFFDF2F8), Color(0xFFF5F3FF)],
-          ),
+  State<ProfileSetUpScreen> createState() => _ProfileSetUpScreenState();
+}
+
+class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
+  final List<TextEditingController> _nameControllers = [];
+  final List<TextEditingController> _phoneControllers = [];
+
+  bool _saving = false;
+  int _currentStep = 0; // 0 = personal info, 1 = emergency contacts
+
+  // Premium Color Palette
+  static const primaryColor = Color(0xFF6366F1); // Indigo
+  static const accentColor = Color(0xFF8B5CF6); // Purple
+  static const textPrimaryColor = Color(0xFF1E293B); // Dark slate
+  static const textSecondaryColor = Color(0xFF64748B); // Slate gray
+
+  @override
+  void initState() {
+    super.initState();
+    // Minimum 2 contacts required
+    _addContact();
+    _addContact();
+  }
+
+  void _addContact() {
+    setState(() {
+      _nameControllers.add(TextEditingController());
+      _phoneControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeContact(int index) {
+    if (_nameControllers.length <= 2) {
+      _showSnackBar("At least 2 emergency contacts are required", isError: true);
+      return;
+    }
+
+    // Dispose controllers before removing
+    _nameControllers[index].dispose();
+    _phoneControllers[index].dispose();
+
+    setState(() {
+      _nameControllers.removeAt(index);
+      _phoneControllers.removeAt(index);
+    });
+
+    _showSnackBar("Contact removed", isError: false);
+  }
+
+  Future<void> _saveProfile() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+
+    final provider = context.read<ProfileProvider>();
+    final name = provider.nameController.text.trim();
+
+    if (name.isEmpty) {
+      _showSnackBar("Please enter your full name", isError: true);
+      setState(() => _saving = false);
+      return;
+    }
+
+    if (_nameControllers.length < 2) {
+      _showSnackBar("Add at least 2 emergency contacts", isError: true);
+      setState(() => _saving = false);
+      return;
+    }
+
+    final List<EmergencyContact> contacts = [];
+
+    for (int i = 0; i < _nameControllers.length; i++) {
+      final cname = _nameControllers[i].text.trim();
+      final phone = _phoneControllers[i].text.trim();
+
+      if (cname.isEmpty || phone.isEmpty) {
+        _showSnackBar("All emergency contact fields must be filled", isError: true);
+        setState(() => _saving = false);
+        return;
+      }
+
+      contacts.add(EmergencyContact(name: cname, phone: phone));
+    }
+
+    final error = await provider.saveProfileData();
+
+    setState(() => _saving = false);
+
+    if (error != null) {
+      _showSnackBar(error, isError: true);
+      return;
+    }
+
+    _showSnackBar("Profile setup complete!", isError: false);
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (_) => false,
+    );
+  }
+
+  void _showSnackBar(String msg, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                msg,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
         ),
-        child: MainSet(),
+        backgroundColor: isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
-}
-
-class MainSet extends StatefulWidget {
-  const MainSet({super.key});
 
   @override
-  State<MainSet> createState() => _MainSetState();
-}
-
-class _MainSetState extends State<MainSet> {
-  Future<String?>? _saveFuture;
+  void dispose() {
+    for (final c in _nameControllers) {
+      c.dispose();
+    }
+    for (final c in _phoneControllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        ListView(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          children: [
-            SizedBox(height: 50),
-            // Header Section
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Setup Your Profile",
-                  style: TextStyle(
-                    fontSize: 32,
-                    color: Color(0xFF1F2937),
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  "Add your details and emergency contacts to stay safe",
-                  style: TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 30),
-            ProfileSet(),
-            SizedBox(height: 20),
-            Contacts(),
-            SizedBox(height: 100),
-          ],
-        ),
-        if (_saveFuture != null)
-          Center(
-            child: FutureBuilder<String?>(
-              future: _saveFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(color: Colors.black),
-                      Text(
-                        "Saving Profile....",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ],
-                  );
-                }
+    final provider = context.watch<ProfileProvider>();
 
-                if (snapshot.connectionState == ConnectionState.done) {
-                  if (snapshot.hasError) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: ${snapshot.error}')),
-                      );
-
-                      setState(() {
-                        _saveFuture = null;
-                      });
-                    });
-
-                    return SizedBox.shrink();
-                  }
-
-                  if (snapshot.hasData && snapshot.data != null) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) return;
-
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text(snapshot.data!)));
-
-                      setState(() {
-                        _saveFuture = null;
-                      });
-                    });
-
-                    return SizedBox.shrink();
-                  }
-
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Profile Saved SuccessFully.")),
-                    );
-
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => HomeScreen()),
-                      (Route<dynamic> route) => false,
-                    );
-                  });
-
-                  return const SizedBox.shrink();
-                }
-
-                return SizedBox.shrink();
-              },
-            ),
+    return Scaffold(
+      // This ensures the layout adjusts when keyboard opens
+      resizeToAvoidBottomInset: true,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFFF8FAFC), // Soft white
+              Color(0xFFF1F5F9), // Light gray
+              Color(0xFFE0E7FF), // Light indigo tint
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        // Floating Complete Button
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 20,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFF9333EA),
-                  Color(0xFFC026D3),
-                  Color(0xFFEC4899),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0xFF9333EA).withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: Offset(0, 10),
+        ),
+        child: Stack(
+          children: [
+            // Ambient background effects
+            Positioned(
+              top: -100,
+              right: -100,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      primaryColor.withOpacity(0.08),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
-            child: Consumer<ProfileProvider>(
-              builder: (ctx, prd, _) {
-                // final names = prd.getTECNames();
-                // final numbers = prd.getTECNumber();
-                // final userName = prd.getName();
-                // final userEmail = prd.getEmail();
+            Positioned(
+              bottom: -150,
+              left: -100,
+              child: Container(
+                width: 350,
+                height: 350,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFA78BFA).withOpacity(0.06),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
-                return ElevatedButton(
-                  onPressed: () async {
-                    // print('Button pressed - starting test write');
-                    // try {
-                    //   await FirebaseFirestore.instance.collection('debug_test').add({'ts': DateTime.now().toIso8601String()});
-                    //   print('Test write success');
-                    //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Test write success')));
-                    // } on FirebaseException catch (e) {
-                    //   print('TEST FirebaseException: code=${e.code} message=${e.message}');
-                    //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.code}')));
-                    // } catch (e, st) {
-                    //   print('TEST Unknown error: $e\n$st');
-                    //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unknown error')));
-                    // }
-
-                    // Validation and save logic
-                    setState(() {
-                      _saveFuture = prd.saveProfileData();
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+            // Main Content Area
+            SafeArea(
+              // FIX: Used a single ListView for the entire page to handle scrolling
+              // and keyboard avoidance gracefully.
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.zero,
+                children: [
+                  _buildHeader(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 10),
+                        _buildPersonalInfoSection(provider),
+                        const SizedBox(height: 40),
+                        _buildEmergencyContactsSection(),
+                        const SizedBox(height: 40),
+                        _buildSaveButton(),
+                        const SizedBox(height: 40), // Bottom breathing room
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.check_circle_outline,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      SizedBox(width: 12),
-                      Text(
-                        "Complete Setup",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        children: [
+          // Icon & Title
+          Row(
+            children: [
+              Container(
+                height: 60,
+                width: 60,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      primaryColor.withOpacity(0.1),
+                      accentColor.withOpacity(0.08),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: primaryColor.withOpacity(0.2),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withOpacity(0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.person_outline_rounded,
+                    size: 30,
+                    color: primaryColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Complete Your Profile",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: textPrimaryColor,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Just a few more details to get started",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: textSecondaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Progress indicator
+          _buildProgressIndicator(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressIndicator() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _buildStepIndicator(0, "Personal", true),
+          Expanded(
+            child: Container(
+              height: 2,
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    primaryColor.withOpacity(0.3),
+                    primaryColor.withOpacity(0.1),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          _buildStepIndicator(1, "Contacts", false),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepIndicator(int step, String label, bool isFirst) {
+    final isActive = step == _currentStep;
+
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: isActive ? primaryColor : Colors.grey.shade200,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              "${step + 1}",
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.grey.shade500,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: isActive ? textPrimaryColor : textSecondaryColor,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 13,
           ),
         ),
       ],
     );
   }
-}
 
-class ProfileSet extends StatelessWidget {
-  const ProfileSet({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Colors.white.withOpacity(0.8), width: 1),
-      ),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF9333EA), Color(0xFFEC4899)],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.person_outline,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                SizedBox(width: 12),
-                Text(
-                  "Personal Information",
-                  style: TextStyle(
-                    color: Color(0xFF1F2937),
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 24),
-            Text(
-              "Full Name",
-              style: TextStyle(
-                color: Color(0xFF374151),
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: CustomTextField(
-                hint: "Enter your full name",
-                hintColor: Color(0xFF9CA3AF),
-                radius: 12,
-                filled: true,
-                fW: FontWeight.normal,
-                filledColor: Color(0xFFF9FAFB),
-                paddingHorizontal: 16,
-                enabledColorBorder: Color(0xFFE5E7EB),
-                focusedColorBorder: Color(0xFF9333EA),
-                tec: context.watch<ProfileProvider>().getName(),
-              ),
-            ),
-            SizedBox(height: 20),
-            // Email Field
-            Text(
-              "Email Address (Optional)",
-              style: TextStyle(
-                color: Color(0xFF374151),
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: CustomTextField(
-                hint: "your.email@example.com",
-                hintColor: Color(0xFF9CA3AF),
-                radius: 12,
-                fW: FontWeight.normal,
-                filled: true,
-                filledColor: Color(0xFFF9FAFB),
-                paddingHorizontal: 16,
-                enabledColorBorder: Color(0xFFE5E7EB),
-                focusedColorBorder: Color(0xFF9333EA),
-                tec: context.watch<ProfileProvider>().getEmail(),
-              ),
-            ),
-          ],
+  Widget _buildPersonalInfoSection(ProfileProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.person_outline_rounded,
+                  size: 20,
+                  color: primaryColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Personal Information",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildInputLabel("Full Name", required: true),
+          const SizedBox(height: 8),
+          CustomTextField(
+            hint: "Enter your full name",
+            tec: provider.nameController,
+          ),
+          const SizedBox(height: 20),
+          _buildInputLabel("Email Address", required: false),
+          const SizedBox(height: 8),
+          CustomTextField(
+            hint: "your@email.com",
+            tec: provider.emailController,
+          ),
+        ],
       ),
     );
   }
-}
 
-class EmergencyContacts extends StatefulWidget {
-  const EmergencyContacts({super.key, required this.index});
+  Widget _buildInputLabel(String label, {required bool required}) {
+    return Row(
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: textSecondaryColor.withOpacity(0.7),
+            letterSpacing: 1.2,
+          ),
+        ),
+        if (required) ...[
+          const SizedBox(width: 4),
+          Text(
+            "*",
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFEF4444),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 
-  final int index;
-
-  @override
-  State<EmergencyContacts> createState() => _EmergencyContacts();
-}
-
-class _EmergencyContacts extends State<EmergencyContacts> {
-  bool _isVisible = true;
-
-  @override
-  Widget build(BuildContext context) {
-    // final controllerNames = context.watch<ProfileProvider>().getTECNames();
-    // final controllerNumbers = context.watch<ProfileProvider>().getTECNumber();
-
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOut,
-      child: AnimatedOpacity(
-        opacity: _isVisible ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 250),
-        child: _isVisible
-            ? Container(
-                margin: EdgeInsets.only(bottom: 12, left: 4, right: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFFAF5FF),
-                      Color(0xFFF3E8FF).withOpacity(0.5),
-                    ],
-                  ),
-                  border: Border.all(
-                    color: Color(0xFFE9D5FF).withOpacity(0.5),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0xFF9333EA).withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: Offset(0, 2),
+  Widget _buildEmergencyContactsSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // FIX: Wrapped in Flexible/Expanded to prevent text pushing button off screen
+              Flexible(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.contact_emergency_rounded,
+                        size: 20,
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Flexible(
+                      child: Text(
+                        "Emergency Contacts",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: textPrimaryColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Contact Number Badge
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF9333EA), Color(0xFFC026D3)],
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            "${widget.index + 1}",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      // Input Fields
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: CustomTextField(
-                                hint: "Contact name",
-                                hintColor: Color(0xFF9CA3AF),
-                                radius: 10,
-                                filled: true,
-                                filledColor: Colors.white,
-                                tec: context
-                                    .watch<ProfileProvider>()
-                                    .getTECNames()[widget.index],
-                                fW: FontWeight.w500,
-                                paddingHorizontal: 5,
-                                enabledColorBorder: Colors.white,
-                                focusedColorBorder: Color(0xFF9333EA),
-                              ),
-                            ),
-                            SizedBox(height: 10),
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: CustomTextField(
-                                hint: "Phone number",
-                                hintColor: Color(0xFF9CA3AF),
-                                radius: 10,
-                                filled: true,
-                                fW: FontWeight.w500,
-                                filledColor: Colors.white,
-                                tec: context
-                                    .watch<ProfileProvider>()
-                                    .getTECNumber()[widget.index],
-                                keyboard: TextInputType.phone,
-                                paddingHorizontal: 5,
-                                enabledColorBorder: Color(0xFFE5E7EB),
-                                focusedColorBorder: Color(0xFF9333EA),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      // Delete Button
-                      // Container(
-                      //   width: 35,
-                      //   height: 35,
-                      //   margin: EdgeInsets.only(top: 4),
-                      //   decoration: BoxDecoration(
-                      //     color: Color(0xFFFEE2E2),
-                      //     borderRadius: BorderRadius.circular(10),
-                      //   ),
-                      //   child: Consumer<ProfileProvider>(),
-                      // ),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          IconButton(
-                            onPressed: () {
-                              _isVisible = false;
-                              int idx = widget.index;
-                              setState(() {});
-                              Future.delayed(Duration(milliseconds: 300), () {
-                                if (mounted) {
-                                  context
-                                      .read<ProfileProvider>()
-                                      .updateRemoveTEC(idx);
-                                  setState(() {});
-                                }
-                              });
-                            },
-                            icon: SvgPicture.asset(
-                              'assets/images/delete.svg',
-                              width: 20,
-                              height: 20,
-                              colorFilter: ColorFilter.mode(
-                                Color(0xFFEF4444),
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+              ),
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  onPressed: _addContact,
+                  icon: Icon(
+                    Icons.add_rounded,
+                    color: primaryColor,
+                    size: 20,
+                  ),
+                  tooltip: "Add Contact",
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7).withOpacity(0.3),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFFFCD34D).withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: const Color(0xFFD97706),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    "Minimum 2 contacts required for safety",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: const Color(0xFF92400E),
+                      height: 1.3,
+                    ),
                   ),
                 ),
-              )
-            : SizedBox.shrink(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          // FIX: Replaced ListView with Column and spread operator
+          // This allows it to exist inside the parent ListView without conflict
+          Column(
+            children: [
+              for (int i = 0; i < _nameControllers.length; i++)
+                Padding(
+                  padding: EdgeInsets.only(
+                      bottom: i == _nameControllers.length - 1 ? 0 : 16),
+                  child: _buildContactCard(i),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
-}
 
-class Contacts extends StatefulWidget {
-  const Contacts({super.key});
-
-  @override
-  State<Contacts> createState() => _Contacts();
-}
-
-class _Contacts extends State<Contacts> {
-  @override
-  initState() {
-    super.initState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProfileProvider>().updateAddTEC(
-        TextEditingController(),
-        TextEditingController(),
-      );
-      context.read<ProfileProvider>().updateAddTEC(
-        TextEditingController(),
-        TextEditingController(),
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // final controllerNames = context.watch<ProfileProvider>().getTECNames();
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Colors.white.withOpacity(0.8), width: 1),
+  Widget _buildContactCard(int index) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1,
+        ),
       ),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 10, right: 10, top: 20, bottom: 5),
-        child: Column(
-          children: [
-            // Header Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF9333EA), Color(0xFFEC4899)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.contact_emergency,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Emergency Contacts",
-                            style: TextStyle(
-                              color: Color(0xFF1F2937),
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Consumer<ProfileProvider>(
-                            builder: (ctx, provider, _) {
-                              return Text(
-                                "${provider.getTECNames().length} contact${provider.getTECNames().length != 1 ? 's' : ''}",
-                                style: TextStyle(
-                                  color: Color(0xFF6B7280),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              );
-                            },
-                          ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          primaryColor.withOpacity(0.15),
+                          accentColor.withOpacity(0.1),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                // Add Contact Button
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFFF3E8FF), Color(0xFFFAE8FF)],
+                      shape: BoxShape.circle,
                     ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Color(0xFFE9D5FF), width: 1),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () {
-                        context.read<ProfileProvider>().updateAddTEC(
-                          TextEditingController(),
-                          TextEditingController(),
-                        );
-                      },
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.add_circle_outline,
-                              color: Color(0xFF9333EA),
-                              size: 18,
-                            ),
-                            SizedBox(width: 3),
-                            Text(
-                              "Add",
-                              style: TextStyle(
-                                color: Color(0xFF9333EA),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ],
+                    child: Center(
+                      child: Text(
+                        "${index + 1}",
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
                         ),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  Text(
+                    "Contact ${index + 1}",
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimaryColor,
+                    ),
+                  ),
+                ],
+              ),
+              if (_nameControllers.length > 2)
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 18,
+                    ),
+                    onPressed: () => _removeContact(index),
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    tooltip: "Remove Contact",
+                  ),
                 ),
-                SizedBox(width: 4),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInputLabel("Name", required: true),
+          const SizedBox(height: 8),
+          CustomTextField(
+            hint: "Contact name",
+            tec: _nameControllers[index],
+          ),
+          const SizedBox(height: 14),
+          _buildInputLabel("Phone Number", required: true),
+          const SizedBox(height: 8),
+          CustomTextField(
+            hint: "+1 234 567 8900",
+            keyboard: TextInputType.phone,
+            tec: _phoneControllers[index],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 62,
+      child: ElevatedButton(
+        onPressed: _saving ? null : _saveProfile,
+        style: ElevatedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+        ),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF6366F1), // Indigo
+                Color(0xFF8B5CF6), // Purple
+                Color(0xFF7C3AED), // Violet
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.4),
+                blurRadius: 25,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: accentColor.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Container(
+            alignment: Alignment.center,
+            child: _saving
+                ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2.5,
+              ),
+            )
+                : const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "Complete Setup",
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ],
             ),
-            SizedBox(height: 10),
-            // Contacts List or Empty State
-            Consumer<ProfileProvider>(
-              builder: (_, provider, _) {
-                final names = provider.getTECNames();
-                return names.isEmpty
-                    ? Container(
-                        padding: EdgeInsets.symmetric(
-                          vertical: 40,
-                          horizontal: 20,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Color(0xFFFECACA),
-                            width: 1,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.contact_phone_outlined,
-                              size: 48,
-                              color: Color(0xFFEF4444),
-                            ),
-                            SizedBox(height: 12),
-                            Text(
-                              "No Emergency Contacts",
-                              style: TextStyle(
-                                color: Color(0xFFEF4444),
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            SizedBox(height: 6),
-                            Text(
-                              "Add at least one emergency contact",
-                              style: TextStyle(
-                                color: Color(0xFFDC2626),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        scrollDirection: Axis.vertical,
-                        itemCount: names.length,
-                        itemBuilder: (context, index) {
-                          return EmergencyContacts(
-                            key: ValueKey(names[index].hashCode),
-                            index: index,
-                          );
-                        },
-                      );
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );

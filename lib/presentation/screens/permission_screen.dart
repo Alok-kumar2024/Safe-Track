@@ -32,15 +32,15 @@ class _PermissionScreenState extends State<PermissionScreen> {
     if (mounted) setState(() {});
   }
 
-  Widget _statusChip(PermissionStatus? status) {
-    if (status == PermissionStatus.granted) {
-      return const Chip(label: Text("Granted"), backgroundColor: Colors.green);
-    }
-    if (status == PermissionStatus.permanentlyDenied) {
-      return const Chip(label: Text("Denied"), backgroundColor: Colors.red);
-    }
-    return const Chip(label: Text("Not allowed"));
-  }
+  // Widget _statusChip(PermissionStatus? status) {
+  //   if (status == PermissionStatus.granted) {
+  //     return const Chip(label: Text("Granted"), backgroundColor: Colors.green);
+  //   }
+  //   if (status == PermissionStatus.permanentlyDenied) {
+  //     return const Chip(label: Text("Denied"), backgroundColor: Colors.red);
+  //   }
+  //   return const Chip(label: Text("Not allowed"));
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -108,8 +108,9 @@ class _PermissionScreenState extends State<PermissionScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: (location == PermissionStatus.granted &&
-                      sms == PermissionStatus.granted &&
-                      call == PermissionStatus.granted)
+                      sms == PermissionStatus.granted
+                      && call == PermissionStatus.granted
+                  )
                       ? () {
                     Navigator.pushReplacement(
                       context,

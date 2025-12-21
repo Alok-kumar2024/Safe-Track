@@ -47,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     await profileProvider.init(); // 🔥 Hive + Firestore restore
 
-    profileProvider.debugPrintHiveData();
+    // profileProvider.debugPrintHiveData();
 
     final homeProvider = context.read<HomeProvider>();
     await homeProvider.init();
@@ -83,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   @override
-  void initState() {
+  initState() {
     super.initState();
 
     //Not good , while change later , the animation and will make more smoothe..

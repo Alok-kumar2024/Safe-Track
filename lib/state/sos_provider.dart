@@ -9,6 +9,8 @@ import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/profile_provider.dart';
 import 'package:safe_track/state/sos_history_provider.dart';
 
+import '../presentation/model/emergency_contact.dart';
+
 class SosProvider extends ChangeNotifier {
   bool _sending = false;
 
@@ -19,38 +21,36 @@ class SosProvider extends ChangeNotifier {
   final SosFeedBackService _feedbackService = SosFeedBackService();
 
   Future<bool?> triggerSos(BuildContext context,
-  {String trigger ='button'}) async {
+      {String trigger = 'button'}) async {
+    // 1. Prevent double triggers
     if (_sending) return null;
     _sending = true;
     notifyListeners();
 
     final homeProvider = context.read<HomeProvider>();
+
+    // 2. Immediate Haptic Feedback (Vibration)
+    // Confirms "Button Pressed" immediately to the user
     await _feedbackService.vibrate();
 
-    if(homeProvider.isSosSoundEnabled)
-      {
-        await _feedbackService.playAlertSound();
-      }
-
     bool success = false;
-
     String locationMessage = 'Location not available (GPS disabled or denied)';
     String address = 'Unknown location';
+
     try {
-      //Fetching Emergency contacts stored in Hive from profile provider....
+      // 3. Get Contacts
       final profileProvider = context.read<ProfileProvider>();
       final contacts = profileProvider.getEmergencyNumbers();
 
       if (contacts.isEmpty) {
         debugPrint('No contacts found');
-        return false; // Fail early if no contacts
+        return false;
       }
 
+      // 4. Get Location (Safe block)
       try {
-        // Attempt to get location
         final position = await _locationService.getCurrentLocation();
 
-        // If successful, overwrite the default message with the link
         final String link = _locationService.getGoogleMapsLink(
             position.latitude,
             position.longitude
@@ -60,22 +60,28 @@ class SosProvider extends ChangeNotifier {
         address = await _locationService.getAddressFromPosition(position);
 
       } catch (e) {
-        // ❌ GPS FAILED: We catch the error here and do NOT stop the function.
-        // We just print it for debugging, but the code continues to the SMS part.
+        // Location failed, but we continue with SMS
         debugPrint('Location failed: $e');
       }
 
-      //This is SOS Message..
+      // 5. Prepare Message
       final sosMessage =
           '🚨 EMERGENCY ALERT 🚨\n\n'
           'I am in danger and need help immediately.\n\n'
           '📍 Location:\n$address\n\n'
           'My current location:\n$locationMessage';
 
+      // 6. Send SMS
       await _smsService.sendSms(
           recipients: contacts,
           message: sosMessage
       );
+
+      // 7. Play Sound ONLY on success
+      // Moved here so it confirms the action worked.
+      if(homeProvider.isSosSoundEnabled) {
+        await _feedbackService.playAlertSound();
+      }
 
       success = true;
       return true;
@@ -84,17 +90,21 @@ class SosProvider extends ChangeNotifier {
       success = false;
       debugPrint('SOS failed: $e');
       return false;
-    }finally{
+    } finally {
 
-      final historyProvider = context.read<SosHistoryProvider>();
+      // 8. Save History
+      // Added mounted check to be safe
+      if (context.mounted) {
+        final historyProvider = context.read<SosHistoryProvider>();
 
-      await historyProvider.addHistory(SosHistory(
-        time: DateTime.now(),
-        locationText: locationMessage,
-        address: address,
-        success: success,
-        trigger: trigger
-      ));
+        await historyProvider.addHistory(SosHistory(
+            time: DateTime.now(),
+            locationText: locationMessage,
+            address: address,
+            success: success,
+            trigger: trigger
+        ));
+      }
 
       _sending = false;
       notifyListeners();

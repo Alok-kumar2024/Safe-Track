@@ -2,5 +2,20 @@ class EmergencyContact {
   final String name;
   final String phone;
 
-  EmergencyContact({required this.name, required this.phone});
+  EmergencyContact({
+    required this.name,
+    required this.phone,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'name': name,
+    'phone': phone,
+  };
+
+  factory EmergencyContact.fromMap(Map<String, dynamic> map) {
+    return EmergencyContact(
+      name: map['name'] ?? '',
+      phone: map['phone'] ?? '',
+    );
+  }
 }

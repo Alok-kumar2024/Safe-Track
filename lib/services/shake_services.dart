@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:sensors_plus/sensors_plus.dart';
 
 class ShakeServices {
-  static const double shakeThreshold = 15.0;
+  static const double shakeThreshold = 30.0;
 
   DateTime _lastTimeShake = DateTime.now();
 

@@ -10,6 +10,63 @@ import 'package:safe_track/state/profile_provider.dart';
 import 'package:safe_track/state/sos_provider.dart';
 import '../../state/sos_history_provider.dart';
 
+// --- 1. New Wrapper for Global Shake Detection ---
+class GlobalShakeHandler extends StatefulWidget {
+  final Widget child;
+  const GlobalShakeHandler({super.key, required this.child});
+
+  @override
+  State<GlobalShakeHandler> createState() => _GlobalShakeHandlerState();
+}
+
+class _GlobalShakeHandlerState extends State<GlobalShakeHandler> {
+  late ShakeServices _shakeServices;
+  bool _isListening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeServices = ShakeServices();
+  }
+
+  @override
+  void dispose() {
+    _shakeServices.stopShakeListening();
+    super.dispose();
+  }
+
+  void _handleShakeService(bool shouldListen) {
+    if (shouldListen && !_isListening) {
+      setState(() => _isListening = true);
+      _shakeServices.startShakeListening(() async {
+        await context.read<SosProvider>().triggerSos(
+          context,
+          trigger: 'shake',
+        );
+      });
+    } else if (!shouldListen && _isListening) {
+      setState(() => _isListening = false);
+      _shakeServices.stopShakeListening();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Listen to the provider to know if Shake is enabled/disabled
+    final isShakeEnabled = context.select<HomeProvider, bool>(
+          (provider) => provider.getShakeValue(),
+    );
+
+    // Manage service state
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleShakeService(isShakeEnabled);
+    });
+
+    return widget.child;
+  }
+}
+
+// --- 2. Refactored Home Screen ---
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -18,189 +75,256 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const double topBarHeight = 150.0;
-
-  bool _shakeListening = false;
-  late ShakeServices _shakeServices;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _shakeServices = ShakeServices();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final homeProvider = context.read<HomeProvider>();
-
-      if (homeProvider.getShakeValue() && !_shakeListening) {
-        _shakeListening = true;
-        _shakeServices.startShakeListening(() async {
-          await context.read<SosProvider>().triggerSos(
-            context,
-            trigger: 'shake',
-          );
-        });
-      }
-    });
-  }
+  // Premium Color Palette
+  static const primaryColor = Color(0xFF6366F1); // Indigo
+  static const accentColor = Color(0xFF8B5CF6); // Purple
+  static const textPrimaryColor = Color(0xFF1E293B); // Dark slate
+  static const textSecondaryColor = Color(0xFF64748B); // Slate gray
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    return Scaffold(
-      body: Stack(
-        children: [
-          Positioned(
-            top: topBarHeight,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: ListView(
-              padding: EdgeInsets.only(top: 5),
-              children: [
-                Sos(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: InkWell(
-                        onTap: () {
-                          print("Clicked Safenavigate..");
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 5),
-                          child: SafeRoutes(),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 1,
-                      child: InkWell(
-                        onTap: () {
-                          print("clicked shareLocation......");
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 5),
-                          child: ShareLocation(),
-                        ),
-                      ),
-                    ),
-                  ],
+    // Wrap Scaffold with GlobalShakeHandler to keep logic alive on all screens
+    return GlobalShakeHandler(
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: Stack(
+          children: [
+            // Ambient background effects
+            Positioned(
+              top: -100,
+              right: -100,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      primaryColor.withOpacity(0.06),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
-                ShakeDetection(),
-                RecentActivities(),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(child: TopBar()),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: [
-          BottomNavigationBarItem(
-            icon: SvgPicture.asset(
-              'assets/images/shield.svg',
-              colorFilter: const ColorFilter.mode(
-                Color(0xFF9333EA),
-                BlendMode.srcIn,
               ),
             ),
-            label: "Home",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.location_on_outlined, color: Color(0xFF9333EA)),
-            label: "Map",
-          ),
-        ],
+            // Main content
+            SafeArea(
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  // Custom AppBar
+                  const SliverToBoxAdapter(
+                    child: TopBar(),
+                  ),
+                  // Content
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        const SizedBox(height: 24),
+                        const Sos(),
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  print("Clicked Safe Navigate..");
+                                },
+                                child: const SafeRoutes(),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  print("Clicked Share Location......");
+                                },
+                                child: const ShareLocation(),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        const ShakeDetection(),
+                        const SizedBox(height: 20),
+                        const RecentActivities(),
+                        const SizedBox(height: 20),
+                      ]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNav(),
       ),
     );
   }
 
-  @override
-  void dispose() {
-    _shakeServices.stopShakeListening();
-    super.dispose();
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                icon: Icons.shield_rounded,
+                label: "Home",
+                isActive: true,
+                onTap: () {},
+              ),
+              _buildNavItem(
+                icon: Icons.map_outlined,
+                label: "Map",
+                isActive: false,
+                onTap: () {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: isActive ? primaryColor.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isActive ? primaryColor : textSecondaryColor,
+              size: 24,
+            ),
+            if (isActive) ...[
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: primaryColor,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 
 class TopBar extends StatelessWidget {
   const TopBar({super.key});
 
+  static const primaryColor = Color(0xFF6366F1);
+  static const textPrimaryColor = Color(0xFF1E293B);
+  static const textSecondaryColor = Color(0xFF64748B);
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(5)),
-        shape: BoxShape.rectangle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: EdgeInsets.all(5),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          //
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(10.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                //
-                children: [
-                  Consumer<ProfileProvider>(
-                    builder: (_, prd, _) {
-                      return Text(
-                        "Hi, ${prd.getName().text}! 👋",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        softWrap: true,
-                      );
-                    },
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    "Stay safe, stay connected",
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
-                  ),
-                ],
-                //
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(15.0),
-              child: InkWell(
-                onTap: () {
-                  //Will open settings features.....
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => SettingsScreen()),
-                  );
-                },
-                child: CircleAvatar(
-                  backgroundColor: Colors.purple.shade50,
-                  radius: 30,
-                  child: Icon(
-                    Icons.settings_outlined,
-                    color: Colors.deepPurple,
-                    size: 30,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Consumer<ProfileProvider>(
+                  builder: (_, prd, __) {
+                    final name = prd.nameController.text.split(' ').first;
+                    return Text(
+                      "Hi, $name! 👋",
+                      style: const TextStyle(
+                        color: textPrimaryColor,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Stay safe, stay connected",
+                  style: TextStyle(
+                    color: textSecondaryColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+              ],
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  primaryColor.withOpacity(0.1),
+                  const Color(0xFF8B5CF6).withOpacity(0.08),
+                ],
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: primaryColor.withOpacity(0.2),
+                width: 2,
               ),
             ),
-          ],
-        ),
+            child: IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              },
+              icon: const Icon(
+                Icons.settings_outlined,
+                color: primaryColor,
+                size: 24,
+              ),
+              tooltip: "Settings",
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -209,149 +333,197 @@ class TopBar extends StatelessWidget {
 class Sos extends StatelessWidget {
   const Sos({super.key});
 
+  static const primaryColor = Color(0xFF6366F1);
+  static const textSecondaryColor = Color(0xFF64748B);
+
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    return Padding(
-      padding: const EdgeInsets.all(15.0),
-      child: Card(
-        elevation: 2,
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
         color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 20, bottom: 20),
-              child: Column(
-                children: [
-                  Consumer<SosProvider>(
-                    builder: (ctx, provider, child) {
-                      return GestureDetector(
-                        // 1. Logic: If sending, disable click (null)
-                        onTap: provider.isSending
-                            ? null
-                            : () async {
-                                debugPrint("clicked");
-
-                                // 2. Trigger SOS using 'ctx'
-                                bool? result = await provider.triggerSos(ctx);
-
-                                // 3. SAFETY CHECK (Crucial for async code)
-                                // If the user closed the screen while SOS was sending, 'ctx' is dead.
-                                // We must check if it's still mounted before using it.
-                                if (!ctx.mounted) return;
-
-                                // 4. Handle Result
-                                if (result == null) return; // Busy/Double click
-
-                                if (result == true) {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("🚨 SOS Sent!"),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("❌ Failed to send SOS."),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                              },
-                        child: Container(
-                          width: 192,
-                          height: 192,
-                          decoration: BoxDecoration(
-                            // 5. VISUAL FEEDBACK: Change color if busy
-                            // If you don't do this, the button stays Red but does nothing when tapped.
-                            gradient: provider.isSending
-                                ? LinearGradient(
-                                    colors: [
-                                      Colors.grey.shade400,
-                                      Colors.grey.shade600,
-                                    ],
-                                  )
-                                : const LinearGradient(
-                                    colors: [
-                                      Color(0xFFEF4444), // Red
-                                      Color(0xFFEC4899), // Pink
-                                    ],
-                                  ),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              // Remove shadow when disabled to look "flat"
-                              provider.isSending
-                                  ? const BoxShadow(color: Colors.transparent)
-                                  : const BoxShadow(
-                                      color: Color(0x40EF4444),
-                                      blurRadius: 40,
-                                      offset: Offset(0, 10),
-                                    ),
-                            ],
-                          ),
-
-                          // 6. Show Spinner if sending, otherwise show Icon+Text
-                          child: provider.isSending
-                              ? const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Icon(
-                                      Icons.error_outline_outlined,
-                                      color: Colors.white,
-                                      size: 80,
-                                    ),
-                                    SizedBox(height: 10),
-                                    Text(
-                                      "SOS",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 25,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      );
-                    },
-                  ),
-
-                  SizedBox(height: 30),
-                  Text(
-                    "Tap to send emergency alert",
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEF4444).withOpacity(0.1),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Status badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDCFCE7),
+              borderRadius: BorderRadius.circular(20),
             ),
-            Positioned(
-              right: 60,
-              top: 35,
-              child: CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.green,
-                child: SvgPicture.asset(
-                  'assets/images/shield.svg',
-                  width: 30,
-                  height: 30,
-                  colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF16A34A),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  "System Active",
+                  style: TextStyle(
+                    color: Color(0xFF15803D),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // SOS Button
+          Consumer<SosProvider>(
+            builder: (ctx, provider, child) {
+              return GestureDetector(
+                onTap: provider.isSending
+                    ? null
+                    : () async {
+                  debugPrint("SOS clicked");
+
+                  bool? result = await provider.triggerSos(ctx);
+
+                  if (!ctx.mounted) return;
+
+                  if (result == null) return;
+
+                  if (result == true) {
+                    _showSnackBar(
+                      ctx,
+                      "Emergency alert sent successfully",
+                      isError: false,
+                    );
+                  } else {
+                    _showSnackBar(
+                      ctx,
+                      "Failed to send emergency alert",
+                      isError: true,
+                    );
+                  }
+                },
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    gradient: provider.isSending
+                        ? LinearGradient(
+                      colors: [
+                        Colors.grey.shade300,
+                        Colors.grey.shade400,
+                      ],
+                    )
+                        : const LinearGradient(
+                      colors: [
+                        Color(0xFFEF4444), // Red
+                        Color(0xFFDC2626), // Darker red
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: provider.isSending
+                        ? []
+                        : [
+                      BoxShadow(
+                        color: const Color(0xFFEF4444).withOpacity(0.4),
+                        blurRadius: 40,
+                        offset: const Offset(0, 15),
+                      ),
+                    ],
+                  ),
+                  child: provider.isSending
+                      ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                  )
+                      : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(
+                        Icons.crisis_alert_rounded,
+                        color: Colors.white,
+                        size: 80,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        "SOS",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 24),
+
+          const Text(
+            "Tap to send emergency alert",
+            style: TextStyle(
+              color: textSecondaryColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSnackBar(BuildContext context, String msg, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                msg,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
           ],
         ),
+        backgroundColor: isError ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -360,54 +532,71 @@ class Sos extends StatelessWidget {
 class SafeRoutes extends StatelessWidget {
   const SafeRoutes({super.key});
 
+  static const primaryColor = Color(0xFF6366F1);
+  static const textPrimaryColor = Color(0xFF1E293B);
+  static const textSecondaryColor = Color(0xFF64748B);
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.only(
-          left: 30,
-          right: 30,
-          top: 30,
-          bottom: 30,
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.5,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.purple.shade50,
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  primaryColor.withOpacity(0.15),
+                  primaryColor.withOpacity(0.08),
+                ],
               ),
-              child: Center(
-                child: Icon(
-                  Icons.map_outlined,
-                  color: Colors.deepPurple,
-                  size: 40,
-                ),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.map_outlined,
+                color: primaryColor,
+                size: 32,
               ),
             ),
-            SizedBox(height: 10),
-            Text(
-              "Safe Navigation",
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Safe Routes",
+            style: TextStyle(
+              color: textPrimaryColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
-            SizedBox(height: 10),
-            Text(
-              "Navigate Safely",
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            "Navigate safely",
+            style: TextStyle(
+              color: textSecondaryColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -416,55 +605,70 @@ class SafeRoutes extends StatelessWidget {
 class ShareLocation extends StatelessWidget {
   const ShareLocation({super.key});
 
+  static const textPrimaryColor = Color(0xFF1E293B);
+  static const textSecondaryColor = Color(0xFF64748B);
+
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    return Card(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.only(
-          left: 30,
-          right: 30,
-          top: 30,
-          bottom: 30,
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1.5,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xffc1f6d3),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF10B981).withOpacity(0.15),
+                  const Color(0xFF10B981).withOpacity(0.08),
+                ],
               ),
-              child: Center(
-                child: Icon(
-                  Icons.location_on_outlined,
-                  color: Colors.greenAccent.shade700,
-                  size: 40,
-                ),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.my_location_rounded,
+                color: Color(0xFF10B981),
+                size: 32,
               ),
             ),
-            SizedBox(height: 10),
-            Text(
-              "Share Location",
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Share Location",
+            style: TextStyle(
+              color: textPrimaryColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
-            SizedBox(height: 10),
-            Text(
-              "Live Tracking",
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            "Live tracking",
+            style: TextStyle(
+              color: textSecondaryColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -473,83 +677,86 @@ class ShareLocation extends StatelessWidget {
 class ShakeDetection extends StatelessWidget {
   const ShakeDetection({super.key});
 
-  // final bool isOn = false;
+  static const primaryColor = Color(0xFF6366F1);
+  static const accentColor = Color(0xFF8B5CF6);
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    return Padding(
-      padding: const EdgeInsets.all(15.0),
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.rectangle,
-          borderRadius: BorderRadius.circular(15),
-          gradient: LinearGradient(
-            colors: [Colors.deepPurpleAccent, Colors.pinkAccent.shade400],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          boxShadow: [
-            BoxShadow(color: Colors.grey, blurRadius: 5, offset: Offset(1, 3)),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            primaryColor,
+            accentColor,
           ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 20, top: 20, bottom: 20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Shake Detection",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  SizedBox(height: 5),
-                  Text(
-                    "Shake phone to trigger SOS",
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                ],
-              ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
             ),
-            Switch(
+            child: const Icon(
+              Icons.vibration_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "Shake Detection",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  "Shake phone to trigger SOS",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Transform.scale(
+            scale: 0.9,
+            child: Switch(
               value: context.watch<HomeProvider>().getShakeValue(),
-              // Use Provider
-              activeColor: Colors.green,
+              activeColor: const Color(0xFF10B981),
               activeTrackColor: Colors.white,
-              inactiveThumbColor: Colors.white,
-              inactiveTrackColor: Colors.grey.shade300,
+              inactiveThumbColor: Colors.white70,
+              inactiveTrackColor: Colors.white.withOpacity(0.3),
               onChanged: (value) {
-                //Will set Later
-                final homeProvider = context.read<HomeProvider>();
-                final sosProvider = context.read<SosProvider>();
-
-                homeProvider.updateShake(value);
-
-                final homeState = context
-                    .findAncestorStateOfType<_HomeScreenState>();
-
-                if (homeState == null) return;
-
-                if (value && !homeState._shakeListening) {
-                  homeState._shakeListening = true;
-                  homeState._shakeServices.startShakeListening(() async {
-                    await sosProvider.triggerSos(context, trigger: 'shake');
-                  });
-                } else {
-                  homeState._shakeListening = false;
-                  homeState._shakeServices.stopShakeListening();
-                }
+                // Just update provider. The GlobalShakeHandler will react automatically.
+                context.read<HomeProvider>().updateShake(value);
               },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -558,91 +765,161 @@ class ShakeDetection extends StatelessWidget {
 class RecentActivities extends StatelessWidget {
   const RecentActivities({super.key});
 
+  static const primaryColor = Color(0xFF6366F1);
+  static const textPrimaryColor = Color(0xFF1E293B);
+  static const textSecondaryColor = Color(0xFF64748B);
+
   @override
   Widget build(BuildContext context) {
     return Consumer<SosHistoryProvider>(
       builder: (_, historyProvider, __) {
         final list = historyProvider.history;
 
-        return Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFE2E8F0),
+              width: 1.5,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- CHANGED SECTION FOR OVERFLOW FIX ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Recent Activity",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (list.isNotEmpty)
-                        TextButton(
-                          onPressed: () {
-                            // Navigate to full history screen later
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AlertHistoryScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text("View All"),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (list.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Column(
-                        children: const [
-                          Icon(
-                            Icons.history_toggle_off,
-                            size: 48,
-                            color: Colors.grey,
+                  // Wrapped in Expanded to prevent pushing the button off
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          SizedBox(height: 12),
-                          Text(
-                            "No alerts yet",
+                          child: const Icon(
+                            Icons.history_rounded,
+                            size: 20,
+                            color: primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Wrapped in Flexible to handle small screens
+                        const Flexible(
+                          child: Text(
+                            "Recent Activity",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: textPrimaryColor,
                             ),
                           ),
-                          SizedBox(height: 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (list.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AlertHistoryScreen(),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                      child: Row(
+                        children: const [
                           Text(
-                            "Your SOS activity will appear here",
-                            style: TextStyle(fontSize: 13, color: Colors.grey),
+                            "View All",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: primaryColor,
                           ),
                         ],
                       ),
                     ),
-
-                  ...list
-                      .take(3)
-                      .map(
-                        (item) => ActivityHistoryCard(
-                          success: item.success,
-                          trigger: item.trigger,
-                          time: item.time,
-                          location: item.locationText,
-                        ),
-                      ),
                 ],
               ),
-            ),
+              // --- END CHANGED SECTION ---
+
+              const SizedBox(height: 16),
+
+              if (list.isEmpty)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.history_toggle_off_rounded,
+                            size: 48,
+                            color: textSecondaryColor.withOpacity(0.5),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          "No alerts yet",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: textSecondaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Your emergency activity will appear here",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: textSecondaryColor.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              ...list.take(3).map(
+                    (item) => ActivityHistoryCard(
+                  success: item.success,
+                  trigger: item.trigger,
+                  time: item.time,
+                  location: item.address,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -650,13 +927,14 @@ class RecentActivities extends StatelessWidget {
   }
 }
 
-// will Add a bit later....
-
 class ActivityHistoryCard extends StatelessWidget {
   final bool success;
   final String trigger;
   final DateTime time;
   final String location;
+
+  static const textPrimaryColor = Color(0xFF1E293B);
+  static const textSecondaryColor = Color(0xFF64748B);
 
   const ActivityHistoryCard({
     super.key,
@@ -669,24 +947,21 @@ class ActivityHistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFE2E8F0),
+          width: 1,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: success
                   ? const Color(0xFFDCFCE7)
@@ -694,14 +969,14 @@ class ActivityHistoryCard extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.warning_rounded,
+              success ? Icons.check_circle_rounded : Icons.error_rounded,
               color: success
                   ? const Color(0xFF16A34A)
                   : const Color(0xFFEF4444),
+              size: 20,
             ),
           ),
-          const SizedBox(width: 16),
-
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -709,36 +984,38 @@ class ActivityHistoryCard extends StatelessWidget {
                 Text(
                   trigger == 'shake' ? 'Shake Detection' : 'Manual SOS',
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimaryColor,
                   ),
                 ),
                 const SizedBox(height: 8),
-
                 Row(
                   children: [
-                    const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                    const Icon(
+                      Icons.access_time_rounded,
+                      size: 14,
+                      color: textSecondaryColor,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       _formatTime(time),
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF6B7280),
+                        color: textSecondaryColor,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 6),
-
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
-                      Icons.location_pin,
+                      Icons.location_on_rounded,
                       size: 14,
-                      color: Colors.grey,
+                      color: textSecondaryColor,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -748,7 +1025,8 @@ class ActivityHistoryCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF6B7280),
+                          color: textSecondaryColor,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -763,7 +1041,9 @@ class ActivityHistoryCard extends StatelessWidget {
   }
 
   String _formatTime(DateTime time) {
-    return "${time.hour}:${time.minute.toString().padLeft(2, '0')} • "
+    final hour = time.hour > 12 ? time.hour - 12 : time.hour;
+    final period = time.hour >= 12 ? 'PM' : 'AM';
+    return "${hour == 0 ? 12 : hour}:${time.minute.toString().padLeft(2, '0')} $period • "
         "${time.day}/${time.month}/${time.year}";
   }
 }

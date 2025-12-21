@@ -12,277 +12,519 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
-      persistentFooterButtons: [BottomPrivacyButton()],
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/login_background.png"),
-            fit: BoxFit.cover,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFFF8FAFC), // Soft white
+              Color(0xFFF1F5F9), // Light gray
+              Color(0xFFE0E7FF), // Light indigo tint
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
-        child: LoginWidget(),
+        child: Stack(
+          children: [
+            // Ambient background effects
+            Positioned(
+              top: -100,
+              right: -100,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF6366F1).withOpacity(0.08),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -150,
+              left: -100,
+              child: Container(
+                width: 350,
+                height: 350,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFA78BFA).withOpacity(0.06),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Main content
+            const SafeArea(
+              child: SingleChildScrollView(
+                physics: BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+                child: LoginWidget(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class LoginWidget extends StatelessWidget {
+// Changed to StatefulWidget to handle state resets properly
+class LoginWidget extends StatefulWidget {
   const LoginWidget({super.key});
 
   @override
-  Widget build(BuildContext context) {
-
-    final loginW = context.watch<LoginProvider>();
-    final authW = context.watch<AuthServices>();
-
-    final loginR = context.read<LoginProvider>();
-    final authR = context.read<AuthServices>();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Spacer(flex: 1),
-
-        Expanded(
-          flex: 1,
-          child: Image.asset(
-            "assets/images/logo_login.png",
-            width: 100,
-            height: 100,
-          ),
-        ),
-        SizedBox(height: 20),
-        Text(
-          "SAFETRACK",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        Text(
-          "Your Guardian, Always",
-          style: TextStyle(color: Colors.white, fontSize: 15),
-        ),
-
-        SizedBox(height: 20),
-        Text(
-          "Enter Your Phone Number",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 25,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        Text(
-          "We'll send you a verification code.",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-
-        SizedBox(height: 100),
-        Padding(
-          padding: const EdgeInsets.only(left: 20, right: 20),
-
-          child: InternationalPhoneNumberInput(
-            onInputChanged: (PhoneNumber number) {
-              loginR.updateUserNumber(number);
-
-              authR.updateLoading(false);
-            },
-            onInputValidated: (bool valid) {
-              loginR.updateIsValid(valid);
-            },
-            selectorTextStyle: TextStyle(color: Colors.black),
-
-            initialValue: loginR.getDefault(),
-
-            //The Country selector thing
-            selectorConfig: SelectorConfig(
-              selectorType: PhoneInputSelectorType.DROPDOWN,
-              showFlags: true,
-              leadingPadding: 10,
-              setSelectorButtonAsPrefixIcon: true,
-              trailingSpace: false,
-            ),
-
-            //Cursor Color
-            cursorColor: Colors.grey.shade500,
-
-            //Input Text Color
-            textStyle: TextStyle(color: Colors.white),
-
-            //Enabling TextField
-            isEnabled: true,
-
-            //Decorating Field
-            inputDecoration: InputDecoration(
-              //Decoration when field is Enabled
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white, width: 2),
-              ),
-              //Filling the inside
-              filled: false,
-
-              //Decoration when typing or selected
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white, width: 2),
-              ),
-
-              //Hint
-              hintText: "Phone Number",
-              //Hint color and styles
-              hintStyle: TextStyle(color: Colors.white),
-
-              //Field border
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: 50),
-        ElevatedButton(
-          onPressed: authW.isLoading ? null : () {
-            final phone =
-                loginR.getUserNumber().phoneNumber ?? "";
-            final valid = loginR.getIsValid();
-            final checked =
-                loginR.getIsChecked() ?? false;
-
-            if (phone.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Phone Number is Empty!!"),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            } else if (!valid) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Phone Number Format is incorrect!!"),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              Provider.of<LoginProvider>(
-                context,
-                listen: false,
-              ).updateCheckedFailed(valid);
-            } else if (!checked) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Accept Terms and Policy !!"),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            } else {
-              //Send OTP to phone
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(builder: (context) => LoginOtpScreen()),
-              // );
-
-              PhoneNumber userNum = loginW.getUserNumber();
-              debugPrint("phone number -> ${userNum.phoneNumber}");
-              authR.verifyPhoneNumber(
-                phoneNumber: "${userNum.phoneNumber}",
-                onCodeSent: (verification, resend) {
-                  debugPrint("Inside  login screen code send");
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => LoginOtpScreen()),
-                  );
-                },
-                onVerificationCompleted: (complete) {},
-                onVerificationFailed: (error) {},
-                onTimeOut: (verifyId) {},
-              );
-            }
-          },
-
-          style: ElevatedButton.styleFrom(
-            elevation: 3,
-            fixedSize: Size(250, 50),
-            disabledBackgroundColor: Colors.purple.shade200,
-            disabledForegroundColor: Colors.white70,
-            backgroundColor: Colors.purple.shade900,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-          ),
-          child: Text(
-            "Send OTP",
-            style: TextStyle(fontSize: 20, color: Colors.white),
-          ),
-        ),
-
-        Spacer(),
-        Visibility(
-          visible: authW.isLoading,
-          child: SpinKitFadingCircle(color: Colors.grey.shade400, size: 50),
-        ),
-        Spacer(),
-      ],
-    );
-  }
+  State<LoginWidget> createState() => _LoginWidgetState();
 }
 
-class BottomPrivacyButton extends StatelessWidget {
-  const BottomPrivacyButton({super.key});
+class _LoginWidgetState extends State<LoginWidget> {
+
+  @override
+  void initState() {
+    super.initState();
+    // FIX 1: Ensure loading is FALSE when screen first loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AuthServices>().updateLoading(false);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.transparent,
-      child: Row(
-        children: [
-          Consumer<LoginProvider>(
-            builder: (_, provider, __) {
-              return Checkbox(
-                value: provider.getIsChecked(),
-                onChanged: (bool? val) {
-                  provider.updateIsChecked(val);
+    // Logic Providers
+    final loginW = context.watch<LoginProvider>();
+    final authW = context.watch<AuthServices>();
+    final loginR = context.read<LoginProvider>();
+    final authR = context.read<AuthServices>();
 
-                  bool value = val ?? false;
-                  provider.updateCheckedFailed(value);
-                },
-                fillColor: MaterialStateProperty.resolveWith<Color>((states) {
-                  if (!provider.getCheckFailed()) {
-                    return Colors.red;
-                  }
-                  return Colors.blue;
-                }),
-              );
-            },
+    // Premium Color Palette - Light Mode
+    const primaryColor = Color(0xFF6366F1); // Indigo
+    const accentColor = Color(0xFF8B5CF6); // Purple
+    const textPrimaryColor = Color(0xFF1E293B); // Dark slate
+    const textSecondaryColor = Color(0xFF64748B); // Slate gray
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 40),
+
+        // --- 1. LOGO & BRANDING ---
+        Row(
+          children: [
+            Container(
+              height: 70,
+              width: 70,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    primaryColor.withOpacity(0.1),
+                    accentColor.withOpacity(0.08),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: primaryColor.withOpacity(0.2),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withOpacity(0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.shield_rounded,
+                  size: 36,
+                  color: primaryColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "SAFETRACK",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: textPrimaryColor,
+                    letterSpacing: 2,
+                  ),
+                ),
+                Text(
+                  "Security Platform",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: textSecondaryColor.withOpacity(0.6),
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 70),
+
+        // --- 2. HEADERS ---
+        const Text(
+          "Welcome back",
+          style: TextStyle(
+            fontSize: 38,
+            fontWeight: FontWeight.w800,
+            color: textPrimaryColor,
+            letterSpacing: -1,
+            height: 1.1,
           ),
-          Column(
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          "Sign in with your phone number to continue\nyour secure journey",
+          style: TextStyle(
+            fontSize: 15,
+            color: textSecondaryColor,
+            height: 1.6,
+            letterSpacing: 0.2,
+          ),
+        ),
+
+        const SizedBox(height: 60),
+
+        // --- 3. PHONE INPUT ---
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFE2E8F0),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.08),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "By continuing, you agree to our",
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-              TextButton(
-                onPressed: () {
-                  //Upon Pressed show privacy policy
-                },
+              Padding(
+                padding: const EdgeInsets.only(left: 20, top: 18, right: 20),
                 child: Text(
-                  "Terms of Service & Privacy Policy",
-                  style: TextStyle(color: Colors.red, fontSize: 14),
+                  "PHONE NUMBER",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: textSecondaryColor.withOpacity(0.7),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: InternationalPhoneNumberInput(
+                  onInputChanged: (PhoneNumber number) {
+                    loginR.updateUserNumber(number);
+                    // Ensure we reset loading if user starts typing again
+                    if (authW.isLoading) authR.updateLoading(false);
+                  },
+                  onInputValidated: (bool valid) {
+                    loginR.updateIsValid(valid);
+                  },
+                  initialValue: loginR.getDefault(),
+                  selectorTextStyle: const TextStyle(
+                    color: textPrimaryColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textStyle: const TextStyle(
+                    color: textPrimaryColor,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
+                  cursorColor: primaryColor,
+                  selectorConfig: const SelectorConfig(
+                    selectorType: PhoneInputSelectorType.BOTTOM_SHEET,
+                    showFlags: true,
+                    leadingPadding: 0,
+                    trailingSpace: false,
+                    setSelectorButtonAsPrefixIcon: false,
+                  ),
+                  inputDecoration: InputDecoration(
+                    contentPadding: const EdgeInsets.only(bottom: 16, top: 8),
+                    hintText: 'Enter your number',
+                    hintStyle: TextStyle(
+                      color: textSecondaryColor.withOpacity(0.4),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    enabledBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                    ),
+                    focusedBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: primaryColor, width: 2),
+                    ),
+                    border: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 50),
+
+        // --- 4. CTA BUTTON ---
+        SizedBox(
+          width: double.infinity,
+          height: 62,
+          child: ElevatedButton(
+            onPressed: authW.isLoading
+                ? null
+                : () {
+              final phone = loginR.getUserNumber().phoneNumber ?? "";
+              final valid = loginR.getIsValid();
+              final checked = loginR.getIsChecked() ?? false;
+
+              if (phone.isEmpty) {
+                _showErrorSnackBar(context, "Phone number is required");
+              } else if (!valid) {
+                _showErrorSnackBar(context, "Invalid phone number format");
+                loginR.updateCheckedFailed(valid);
+              } else if (!checked) {
+                _showErrorSnackBar(
+                    context, "Please accept Terms and Privacy Policy");
+                loginR.updateCheckedFailed(false);
+              } else {
+
+                // --- FIX 2: START VERIFICATION ---
+                authR.verifyPhoneNumber(
+                  phoneNumber: "${loginW.getUserNumber().phoneNumber}",
+
+                  onCodeSent: (verification, resend) {
+                    // FIX 3: Add .then() to reset loading when returning
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const LoginOtpScreen()),
+                    ).then((_) {
+                      // This runs when you come BACK from OTP screen
+                      if(mounted) {
+                        context.read<AuthServices>().updateLoading(false);
+                      }
+                    });
+                  },
+
+                  onVerificationCompleted: (complete) {
+                    // If auto-verified, stop loading
+                    authR.updateLoading(false);
+                  },
+
+                  onVerificationFailed: (error) {
+                    // FIX 4: Explicitly stop loading on error
+                    authR.updateLoading(false);
+                    _showErrorSnackBar(context, error ?? "Verification Failed");
+                  },
+
+                  onTimeOut: (verifyId) {
+                    authR.updateLoading(false);
+                  },
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              padding: EdgeInsets.zero,
+              elevation: 0,
+            ),
+            child: Ink(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF6366F1), // Indigo
+                    Color(0xFF8B5CF6), // Purple
+                    Color(0xFF7C3AED), // Violet
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withOpacity(0.4),
+                    blurRadius: 25,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Container(
+                alignment: Alignment.center,
+                child: authW.isLoading
+                    ? const SpinKitThreeBounce(
+                  color: Colors.white,
+                  size: 22,
+                )
+                    : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Continue",
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 35),
+
+        // --- 5. TERMS & PRIVACY ---
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFE2E8F0),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Consumer<LoginProvider>(
+                builder: (_, provider, __) {
+                  return SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: Checkbox(
+                      value: provider.getIsChecked(),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      activeColor: primaryColor,
+                      checkColor: Colors.white,
+                      onChanged: (bool? val) {
+                        provider.updateIsChecked(val);
+                        bool value = val ?? false;
+                        provider.updateCheckedFailed(value);
+                      },
+                      side: MaterialStateBorderSide.resolveWith(
+                            (states) {
+                          if (!provider.getCheckFailed()) {
+                            return const BorderSide(
+                                color: Color(0xFFEF4444), width: 2);
+                          }
+                          return BorderSide(
+                            color: textSecondaryColor.withOpacity(0.3),
+                            width: 1.5,
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: textSecondaryColor.withOpacity(0.8),
+                      height: 1.5,
+                      letterSpacing: 0.2,
+                    ),
+                    children: [
+                      const TextSpan(text: "I agree to the "),
+                      TextSpan(
+                        text: "Terms of Service",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: primaryColor.withOpacity(0.9),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                      const TextSpan(text: " and "),
+                      TextSpan(
+                        text: "Privacy Policy",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: primaryColor.withOpacity(0.9),
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          Spacer(),
-        ],
+        ),
+      ],
+    );
+  }
+
+  void _showErrorSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
