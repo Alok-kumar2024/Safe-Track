@@ -1,7 +1,7 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class LocationService {
-
 
   Future<Position> getCurrentLocation() async {
     bool serviceEnabled;
@@ -34,6 +34,20 @@ class LocationService {
       ),
     );
   }
+
+  Future<String> getAddressFromPosition(Position position) async {
+    final placemarks = await placemarkFromCoordinates(
+      position.latitude,
+      position.longitude,
+    );
+
+    if (placemarks.isEmpty) return "Unknown location";
+
+    final p = placemarks.first;
+
+    return "${p.street}, ${p.locality}, ${p.administrativeArea}";
+  }
+
 
   String getGoogleMapsLink(double lat, double lng) {
     return 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';

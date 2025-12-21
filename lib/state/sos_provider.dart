@@ -35,7 +35,7 @@ class SosProvider extends ChangeNotifier {
     bool success = false;
 
     String locationMessage = 'Location not available (GPS disabled or denied)';
-
+    String address = 'Unknown location';
     try {
       //Fetching Emergency contacts stored in Hive from profile provider....
       final profileProvider = context.read<ProfileProvider>();
@@ -57,6 +57,8 @@ class SosProvider extends ChangeNotifier {
         );
         locationMessage = link;
 
+        address = await _locationService.getAddressFromPosition(position);
+
       } catch (e) {
         // ❌ GPS FAILED: We catch the error here and do NOT stop the function.
         // We just print it for debugging, but the code continues to the SMS part.
@@ -67,6 +69,7 @@ class SosProvider extends ChangeNotifier {
       final sosMessage =
           '🚨 EMERGENCY ALERT 🚨\n\n'
           'I am in danger and need help immediately.\n\n'
+          '📍 Location:\n$address\n\n'
           'My current location:\n$locationMessage';
 
       await _smsService.sendSms(
@@ -88,6 +91,7 @@ class SosProvider extends ChangeNotifier {
       await historyProvider.addHistory(SosHistory(
         time: DateTime.now(),
         locationText: locationMessage,
+        address: address,
         success: success,
         trigger: trigger
       ));

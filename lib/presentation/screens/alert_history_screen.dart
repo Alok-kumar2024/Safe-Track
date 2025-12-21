@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../services/map_service.dart';
 import '../../state/sos_history_provider.dart';
 import '../model/sos_history.dart';
 
@@ -86,8 +88,9 @@ class AlertHistoryScreen extends StatelessWidget {
 
 class ActivityHistoryCard extends StatelessWidget {
   final SosHistory history;
+  final MapService _mapService = MapService();
 
-  const ActivityHistoryCard({super.key, required this.history});
+  ActivityHistoryCard({super.key, required this.history});
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +208,7 @@ class ActivityHistoryCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        history.locationText,
+                        history.address,
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF6B7280),
@@ -217,8 +220,10 @@ class ActivityHistoryCard extends StatelessWidget {
                 const SizedBox(height: 8),
 
                 GestureDetector(
-                  onTap: () {
+                  onTap: () async {
                     // TODO: open maps later
+                    final url = history.locationText;
+                    await _mapService.openMap(url);
                   },
                   child: const Text(
                     'View on Map →',

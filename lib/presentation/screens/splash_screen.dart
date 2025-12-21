@@ -8,8 +8,10 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/colors/app_colors.dart';
 import 'package:safe_track/presentation/screens/login_screen.dart';
+import 'package:safe_track/presentation/screens/permission_screen.dart';
 import 'package:safe_track/presentation/screens/profile_setup_screen.dart';
 
+import '../../services/permission_service.dart';
 import '../../state/home_provider.dart';
 import '../../state/profile_provider.dart';
 import 'home_screen.dart';
@@ -50,19 +52,32 @@ class _SplashScreenState extends State<SplashScreen>
     final homeProvider = context.read<HomeProvider>();
     await homeProvider.init();
 
-
     if (!mounted) return;
 
     // Decide based on profileSet
-    if (profileProvider.isProfileSet) {
+    if (!profileProvider.isProfileSet) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => HomeScreen()),
+        MaterialPageRoute(builder: (_) => ProfileSetUpScreen()),
+      );
+      return;
+    }
+
+    // ✅ Profile exists → check permissions
+    final permissionService = PermissionService();
+    final granted = await permissionService.allGranted();
+
+    if (!mounted) return;
+
+    if (!granted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => PermissionScreen()),
       );
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => ProfileSetUpScreen()),
+        MaterialPageRoute(builder: (_) => HomeScreen()),
       );
     }
   }
@@ -130,7 +145,6 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.dispose();
     super.dispose();
   }
-
 }
 
 class BackgroundSplash extends StatelessWidget {

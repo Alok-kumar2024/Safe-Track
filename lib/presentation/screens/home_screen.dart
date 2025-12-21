@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/presentation/screens/alert_history_screen.dart';
+import 'package:safe_track/presentation/screens/settings_screen.dart';
 import 'package:safe_track/services/shake_services.dart';
 import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/profile_provider.dart';
@@ -182,6 +183,10 @@ class TopBar extends StatelessWidget {
               child: InkWell(
                 onTap: () {
                   //Will open settings features.....
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => SettingsScreen()),
+                  );
                 },
                 child: CircleAvatar(
                   backgroundColor: Colors.purple.shade50,
@@ -619,24 +624,22 @@ class RecentActivities extends StatelessWidget {
                           SizedBox(height: 4),
                           Text(
                             "Your SOS activity will appear here",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 13, color: Colors.grey),
                           ),
                         ],
                       ),
                     ),
 
-                  ...list.take(3).map(
+                  ...list
+                      .take(3)
+                      .map(
                         (item) => ActivityHistoryCard(
-                      success: item.success,
-                      trigger: item.trigger,
-                      time: item.time,
-                      location: item.locationText,
-                    ),
-                  ),
-
+                          success: item.success,
+                          trigger: item.trigger,
+                          time: item.time,
+                          location: item.locationText,
+                        ),
+                      ),
                 ],
               ),
             ),
@@ -704,9 +707,7 @@ class ActivityHistoryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  trigger == 'shake'
-                      ? 'Shake Detection'
-                      : 'Manual SOS',
+                  trigger == 'shake' ? 'Shake Detection' : 'Manual SOS',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -734,8 +735,11 @@ class ActivityHistoryCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.location_pin,
-                        size: 14, color: Colors.grey),
+                    const Icon(
+                      Icons.location_pin,
+                      size: 14,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -763,4 +767,3 @@ class ActivityHistoryCard extends StatelessWidget {
         "${time.day}/${time.month}/${time.year}";
   }
 }
-

@@ -38,4 +38,10 @@ class HomeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void reset() {
+    _isShakeTrue = false;
+    _isSosSoundEnabled = true;
+    notifyListeners();
+  }
+
 }
