@@ -13,6 +13,7 @@ import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/login_provider.dart';
 import 'package:safe_track/state/otp_provider.dart';
 import 'package:safe_track/state/profile_provider.dart';
+import 'package:safe_track/state/sos_history_provider.dart';
 import 'package:safe_track/state/sos_provider.dart';
 
 void main() async {
@@ -42,6 +43,13 @@ void main() async {
           return home;
         }),
         ChangeNotifierProvider(create: (_) => SosProvider()),
+        ChangeNotifierProvider(
+          create: (_) {
+            final provider = SosHistoryProvider();
+            provider.loadHistory();
+            return provider;
+          },
+        ),
       ],
       child: const MyApp(),
     ),

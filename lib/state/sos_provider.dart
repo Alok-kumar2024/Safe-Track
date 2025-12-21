@@ -1,10 +1,13 @@
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
+import 'package:safe_track/presentation/model/sos_history.dart';
 import 'package:safe_track/services/location_service.dart';
 import 'package:safe_track/services/sms_service.dart';
 import 'package:safe_track/services/sos_feedback_service.dart';
+import 'package:safe_track/services/sos_history_storage_service.dart';
 import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/profile_provider.dart';
+import 'package:safe_track/state/sos_history_provider.dart';
 
 class SosProvider extends ChangeNotifier {
   bool _sending = false;
@@ -15,19 +18,23 @@ class SosProvider extends ChangeNotifier {
   final SmsService _smsService = SmsService();
   final SosFeedBackService _feedbackService = SosFeedBackService();
 
-  Future<bool?> triggerSos(BuildContext context) async {
+  Future<bool?> triggerSos(BuildContext context,
+  {String trigger ='button'}) async {
     if (_sending) return null;
     _sending = true;
     notifyListeners();
 
     final homeProvider = context.read<HomeProvider>();
-
     await _feedbackService.vibrate();
 
     if(homeProvider.isSosSoundEnabled)
       {
         await _feedbackService.playAlertSound();
       }
+
+    bool success = false;
+
+    String locationMessage = 'Location not available (GPS disabled or denied)';
 
     try {
       //Fetching Emergency contacts stored in Hive from profile provider....
@@ -38,8 +45,6 @@ class SosProvider extends ChangeNotifier {
         debugPrint('No contacts found');
         return false; // Fail early if no contacts
       }
-
-      String locationMessage = 'Location not available (GPS disabled or denied)';
 
       try {
         // Attempt to get location
@@ -69,12 +74,24 @@ class SosProvider extends ChangeNotifier {
           message: sosMessage
       );
 
+      success = true;
       return true;
 
     } catch (e) {
+      success = false;
       debugPrint('SOS failed: $e');
       return false;
     }finally{
+
+      final historyProvider = context.read<SosHistoryProvider>();
+
+      await historyProvider.addHistory(SosHistory(
+        time: DateTime.now(),
+        locationText: locationMessage,
+        success: success,
+        trigger: trigger
+      ));
+
       _sending = false;
       notifyListeners();
     }

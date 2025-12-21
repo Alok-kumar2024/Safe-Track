@@ -2,10 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
+import 'package:safe_track/presentation/screens/alert_history_screen.dart';
 import 'package:safe_track/services/shake_services.dart';
 import 'package:safe_track/state/home_provider.dart';
 import 'package:safe_track/state/profile_provider.dart';
 import 'package:safe_track/state/sos_provider.dart';
+import '../../state/sos_history_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,26 +19,28 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const double topBarHeight = 150.0;
 
+  bool _shakeListening = false;
   late ShakeServices _shakeServices;
 
   @override
-  void initState()
-  {
+  void initState() {
     super.initState();
 
     _shakeServices = ShakeServices();
 
-    WidgetsBinding.instance.addPostFrameCallback((_){
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       final homeProvider = context.read<HomeProvider>();
 
-      if(homeProvider.getShakeValue())
-        {
-          _shakeServices.startShakeListening(() async {
-            await context.read<SosProvider>().triggerSos(context);
-          });
-        }
+      if (homeProvider.getShakeValue() && !_shakeListening) {
+        _shakeListening = true;
+        _shakeServices.startShakeListening(() async {
+          await context.read<SosProvider>().triggerSos(
+            context,
+            trigger: 'shake',
+          );
+        });
+      }
     });
-
   }
 
   @override
@@ -118,13 +122,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void dispose()
-  {
+  void dispose() {
     _shakeServices.stopShakeListening();
     super.dispose();
-
   }
-
 }
 
 class TopBar extends StatelessWidget {
@@ -157,9 +158,7 @@ class TopBar extends StatelessWidget {
                   Consumer<ProfileProvider>(
                     builder: (_, prd, _) {
                       return Text(
-                        "Hi, ${prd
-                            .getName()
-                            .text}! 👋",
+                        "Hi, ${prd.getName().text}! 👋",
                         style: TextStyle(
                           color: Colors.black,
                           fontSize: 22,
@@ -225,34 +224,38 @@ class Sos extends StatelessWidget {
                     builder: (ctx, provider, child) {
                       return GestureDetector(
                         // 1. Logic: If sending, disable click (null)
-                        onTap: provider.isSending ? null : () async {
-                          debugPrint("clicked");
+                        onTap: provider.isSending
+                            ? null
+                            : () async {
+                                debugPrint("clicked");
 
-                          // 2. Trigger SOS using 'ctx'
-                          bool? result = await provider.triggerSos(ctx);
+                                // 2. Trigger SOS using 'ctx'
+                                bool? result = await provider.triggerSos(ctx);
 
-                          // 3. SAFETY CHECK (Crucial for async code)
-                          // If the user closed the screen while SOS was sending, 'ctx' is dead.
-                          // We must check if it's still mounted before using it.
-                          if (!ctx.mounted) return;
+                                // 3. SAFETY CHECK (Crucial for async code)
+                                // If the user closed the screen while SOS was sending, 'ctx' is dead.
+                                // We must check if it's still mounted before using it.
+                                if (!ctx.mounted) return;
 
-                          // 4. Handle Result
-                          if (result == null) return; // Busy/Double click
+                                // 4. Handle Result
+                                if (result == null) return; // Busy/Double click
 
-                          if (result == true) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                  content: Text("🚨 SOS Sent!"),
-                                  backgroundColor: Colors.green,
-                                ));
-                          } else {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                  content: Text("❌ Failed to send SOS."),
-                                  backgroundColor: Colors.red,
-                                ));
-                          }
-                        },
+                                if (result == true) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("🚨 SOS Sent!"),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("❌ Failed to send SOS."),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
                         child: Container(
                           width: 192,
                           height: 192,
@@ -260,52 +263,57 @@ class Sos extends StatelessWidget {
                             // 5. VISUAL FEEDBACK: Change color if busy
                             // If you don't do this, the button stays Red but does nothing when tapped.
                             gradient: provider.isSending
-                                ? LinearGradient(colors: [
-                              Colors.grey.shade400,
-                              Colors.grey.shade600
-                            ])
+                                ? LinearGradient(
+                                    colors: [
+                                      Colors.grey.shade400,
+                                      Colors.grey.shade600,
+                                    ],
+                                  )
                                 : const LinearGradient(
-                              colors: [
-                                Color(0xFFEF4444), // Red
-                                Color(0xFFEC4899), // Pink
-                              ],
-                            ),
+                                    colors: [
+                                      Color(0xFFEF4444), // Red
+                                      Color(0xFFEC4899), // Pink
+                                    ],
+                                  ),
                             shape: BoxShape.circle,
                             boxShadow: [
                               // Remove shadow when disabled to look "flat"
                               provider.isSending
                                   ? const BoxShadow(color: Colors.transparent)
                                   : const BoxShadow(
-                                color: Color(0x40EF4444),
-                                blurRadius: 40,
-                                offset: Offset(0, 10),
-                              ),
+                                      color: Color(0x40EF4444),
+                                      blurRadius: 40,
+                                      offset: Offset(0, 10),
+                                    ),
                             ],
                           ),
 
                           // 6. Show Spinner if sending, otherwise show Icon+Text
                           child: provider.isSending
-                              ? const Center(child: CircularProgressIndicator(
-                              color: Colors.white))
+                              ? const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
+                                )
                               : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.error_outline_outlined,
-                                color: Colors.white,
-                                size: 80,
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                "SOS",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 25,
-                                  fontWeight: FontWeight.w900,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(
+                                      Icons.error_outline_outlined,
+                                      color: Colors.white,
+                                      size: 80,
+                                    ),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      "SOS",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 25,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
                         ),
                       );
                     },
@@ -460,7 +468,7 @@ class ShareLocation extends StatelessWidget {
 class ShakeDetection extends StatelessWidget {
   const ShakeDetection({super.key});
 
-  final bool isOn = false;
+  // final bool isOn = false;
 
   @override
   Widget build(BuildContext context) {
@@ -519,16 +527,18 @@ class ShakeDetection extends StatelessWidget {
 
                 homeProvider.updateShake(value);
 
-                final homeState =
-                context.findAncestorStateOfType<_HomeScreenState>();
+                final homeState = context
+                    .findAncestorStateOfType<_HomeScreenState>();
 
                 if (homeState == null) return;
 
-                if (value) {
+                if (value && !homeState._shakeListening) {
+                  homeState._shakeListening = true;
                   homeState._shakeServices.startShakeListening(() async {
-                    await sosProvider.triggerSos(context);
+                    await sosProvider.triggerSos(context, trigger: 'shake');
                   });
                 } else {
+                  homeState._shakeListening = false;
                   homeState._shakeServices.stopShakeListening();
                 }
               },
@@ -545,122 +555,212 @@ class RecentActivities extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Card(
-        color: Colors.white,
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                left: 15,
-                right: 15,
-                top: 15,
-                bottom: 10,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Consumer<SosHistoryProvider>(
+      builder: (_, historyProvider, __) {
+        final list = historyProvider.history;
+
+        return Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Recent Activity",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Recent Activity",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (list.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            // Navigate to full history screen later
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AlertHistoryScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text("View All"),
+                        ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      "View All",
-                      style: TextStyle(
-                        color: Colors.deepPurpleAccent,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w500,
+                  const SizedBox(height: 10),
+
+                  if (list.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Column(
+                        children: const [
+                          Icon(
+                            Icons.history_toggle_off,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            "No alerts yet",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            "Your SOS activity will appear here",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+
+                  ...list.take(3).map(
+                        (item) => ActivityHistoryCard(
+                      success: item.success,
+                      trigger: item.trigger,
+                      time: item.time,
+                      location: item.locationText,
+                    ),
                   ),
+
                 ],
               ),
             ),
-            ListView(
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              children: [ActivitiesCard()],
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
-class ActivitiesCard extends StatelessWidget {
-  const ActivitiesCard({super.key});
+// will Add a bit later....
+
+class ActivityHistoryCard extends StatelessWidget {
+  final bool success;
+  final String trigger;
+  final DateTime time;
+  final String location;
+
+  const ActivityHistoryCard({
+    super.key,
+    required this.success,
+    required this.trigger,
+    required this.time,
+    required this.location,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    return Padding(
-      padding: const EdgeInsets.only(left: 10, right: 10, bottom: 10),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Row(
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.deepPurple.shade100,
-                    child: Icon(
-                      Icons.access_time,
-                      color: Colors.deepPurpleAccent.shade400,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(width: 5),
-              Padding(
-                padding: EdgeInsets.only(left: 15),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: success
+                  ? const Color(0xFFDCFCE7)
+                  : const Color(0xFFFEE2E2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.warning_rounded,
+              color: success
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFEF4444),
+            ),
+          ),
+          const SizedBox(width: 16),
 
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  trigger == 'shake'
+                      ? 'Shake Detection'
+                      : 'Manual SOS',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                Row(
                   children: [
+                    const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                    const SizedBox(width: 6),
                     Text(
-                      "Alert Sent Successfully",
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                    Text(
-                      "Today at 2:30 PM",
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontSize: 18,
-                      ),
-                    ),
-                    Text(
-                      "Sector 12, Dwarka, Delhi",
-                      style: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: 16,
+                      _formatTime(time),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6B7280),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 6),
+
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_pin,
+                        size: 14, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        location,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
+
+  String _formatTime(DateTime time) {
+    return "${time.hour}:${time.minute.toString().padLeft(2, '0')} • "
+        "${time.day}/${time.month}/${time.year}";
+  }
 }
+
