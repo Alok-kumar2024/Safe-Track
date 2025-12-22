@@ -5,6 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/firebase_options.dart';
+import 'package:safe_track/presentation/screens/permission_screen.dart';
 import 'package:safe_track/presentation/screens/profile_setup_screen.dart';
 import 'package:safe_track/presentation/screens/splash_screen.dart';
 import 'package:safe_track/services/auth_services.dart';

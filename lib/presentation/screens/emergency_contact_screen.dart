@@ -19,11 +19,11 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen>
   static const accentColor = Color(0xFF8B5CF6); // Purple
   static const textPrimaryColor = Color(0xFF1E293B); // Dark slate
   static const textSecondaryColor = Color(0xFF64748B); // Slate gray
+  static const dangerColor = Color(0xFFEF4444); // Red
 
   @override
   void initState() {
     super.initState();
-    // Initialize the fade animation
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -58,7 +58,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen>
         ),
         child: Stack(
           children: [
-            // Ambient background effects
+            // Ambient background circle
             Positioned(
               top: -100,
               right: -100,
@@ -76,28 +76,49 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen>
                 ),
               ),
             ),
-            // Main content
+
+            // Main Content
             SafeArea(
               child: Column(
                 children: [
                   _buildHeader(context),
                   Expanded(
-                    // Wrap the list in FadeTransition
-                    child: FadeTransition(
+                    child: contacts.isEmpty
+                        ? FadeTransition(
                       opacity: _animationController,
-                      child: contacts.isEmpty
-                          ? _EmptyContacts()
-                          : ListView.builder(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-                        itemCount: contacts.length,
-                        itemBuilder: (_, index) {
-                          return _ContactCard(
-                            contact: contacts[index],
-                            index: index,
-                          );
-                        },
-                      ),
+                      child: _EmptyContacts(),
+                    )
+                        : ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
+                      itemCount: contacts.length,
+                      itemBuilder: (_, index) {
+                        // Staggered Animation for items
+                        final animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+                          CurvedAnimation(
+                            parent: _animationController,
+                            curve: Interval(
+                              (index * 0.1).clamp(0.0, 1.0),
+                              1.0,
+                              curve: Curves.easeOut,
+                            ),
+                          ),
+                        );
+
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.1),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: _ContactCard(
+                              contact: contacts[index],
+                              index: index,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -164,13 +185,23 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen>
                 Consumer<ProfileProvider>(
                   builder: (_, provider, __) {
                     final count = provider.contacts.length;
-                    return Text(
-                      '$count contact${count != 1 ? 's' : ''} • Min 2 required',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: textSecondaryColor,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    return Row(
+                      children: [
+                        Icon(
+                          count < 2 ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded,
+                          size: 14,
+                          color: count < 2 ? dangerColor : const Color(0xFF10B981),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$count contact${count != 1 ? 's' : ''} • Min 2 required',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: count < 2 ? dangerColor : textSecondaryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -183,27 +214,23 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen>
   }
 
   Widget _buildFAB(BuildContext context) {
-    // Also animate the FAB entrance slightly delayed or just use the same fade
     return FadeTransition(
       opacity: _animationController,
       child: Container(
-        height: 62,
-        width: 62,
+        height: 60,
+        width: 60,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              primaryColor,
-              accentColor,
-            ],
+            colors: [primaryColor, accentColor],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: primaryColor.withOpacity(0.4),
               blurRadius: 20,
-              offset: const Offset(0, 10),
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -211,13 +238,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen>
           color: Colors.transparent,
           child: InkWell(
             onTap: () => _openAddDialog(context),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
             child: const Center(
-              child: Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 28,
-              ),
+              child: Icon(Icons.add_rounded, color: Colors.white, size: 30),
             ),
           ),
         ),
@@ -241,6 +264,7 @@ class _ContactCard extends StatelessWidget {
   static const primaryColor = Color(0xFF6366F1);
   static const textPrimaryColor = Color(0xFF1E293B);
   static const textSecondaryColor = Color(0xFF64748B);
+  static const dangerColor = Color(0xFFEF4444);
 
   const _ContactCard({
     required this.contact,
@@ -253,13 +277,13 @@ class _ContactCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: const Color(0xFFE2E8F0),
-          width: 1.5,
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -271,62 +295,35 @@ class _ContactCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Avatar with number badge
-          Stack(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      primaryColor.withOpacity(0.15),
-                      const Color(0xFF8B5CF6).withOpacity(0.1),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.person_rounded,
-                    color: primaryColor,
-                    size: 28,
-                  ),
+          // Avatar
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  primaryColor.withOpacity(0.15),
+                  const Color(0xFF8B5CF6).withOpacity(0.1),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '#',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: primaryColor,
                 ),
               ),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 2,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${index + 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(width: 16),
 
-          // Contact info
+          // Contact Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,7 +334,6 @@ class _ContactCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                     color: textPrimaryColor,
-                    letterSpacing: -0.2,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -345,18 +341,14 @@ class _ContactCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(
-                      Icons.phone_rounded,
-                      size: 14,
-                      color: textSecondaryColor,
-                    ),
-                    const SizedBox(width: 6),
+                    Icon(Icons.phone_iphone_rounded, size: 14, color: textSecondaryColor),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: Text(
                         contact.phone,
                         style: TextStyle(
                           color: textSecondaryColor,
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
@@ -369,54 +361,25 @@ class _ContactCard extends StatelessWidget {
             ),
           ),
 
-          // Action buttons
+          // Actions
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.edit_rounded,
-                    color: primaryColor,
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => _ContactDialog(
-                        index: index,
-                        contact: contact,
-                      ),
-                    );
-                  },
-                  padding: const EdgeInsets.all(8),
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Edit Contact',
-                ),
+              _buildActionButton(
+                icon: Icons.edit_rounded,
+                color: primaryColor,
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => _ContactDialog(index: index, contact: contact),
+                  );
+                },
               ),
               const SizedBox(width: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.delete_rounded,
-                    color: Color(0xFFEF4444),
-                    size: 20,
-                  ),
-                  onPressed: () =>
-                      _showDeleteConfirmation(context, provider, index),
-                  padding: const EdgeInsets.all(8),
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Delete Contact',
-                ),
+              _buildActionButton(
+                icon: Icons.delete_outline_rounded,
+                color: dangerColor,
+                onTap: () => _handleDelete(context, provider, index),
               ),
             ],
           ),
@@ -425,123 +388,229 @@ class _ContactCard extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(
-      BuildContext context,
-      ProfileProvider provider,
-      int index,
-      ) {
-    // Prevent deletion if only 2 contacts remain
-    if (provider.contacts.length <= 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Minimum 2 contacts required',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFFEF4444),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 3),
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
         ),
+        child: Icon(icon, color: color, size: 20),
+      ),
+    );
+  }
+
+  void _handleDelete(BuildContext context, ProfileProvider provider, int index) {
+    if (provider.contacts.length <= 2) {
+      _showModernSnackBar(
+        context,
+        'Minimum 2 contacts required for safety',
+        Icons.shield_rounded,
+        dangerColor,
       );
       return;
     }
 
+    // Show Custom Delete Dialog
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: const [
-            Icon(Icons.warning_rounded, color: Color(0xFFEF4444)),
-            SizedBox(width: 12),
-            Text(
-              'Delete Contact',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
+      barrierDismissible: false,
+      builder: (ctx) => _DeleteConfirmationDialog(
+        contactName: contact.name,
+        onConfirm: () {
+          provider.deleteContact(index);
+          Navigator.pop(ctx);
+          _showModernSnackBar(
+            context,
+            'Contact removed successfully',
+            Icons.check_circle_rounded,
+            const Color(0xFF10B981),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showModernSnackBar(BuildContext context, String message, IconData icon, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               ),
             ),
           ],
         ),
-        content: Text(
-          'Are you sure you want to remove ${contact.name} from your emergency contacts?',
-          style: const TextStyle(
-            fontSize: 15,
-            height: 1.5,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: textSecondaryColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              provider.deleteContact(index);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: const [
-                      Icon(Icons.check_circle_outline_rounded,
-                          color: Colors.white, size: 20),
-                      SizedBox(width: 12),
-                      Text(
-                        'Contact deleted',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  backgroundColor: const Color(0xFF10B981),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  margin: const EdgeInsets.all(16),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(
-                color: Color(0xFFEF4444),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// CUSTOM DELETE DIALOG - The major improvement requested
+// ---------------------------------------------------------------------------
+class _DeleteConfirmationDialog extends StatelessWidget {
+  final String contactName;
+  final VoidCallback onConfirm;
+
+  const _DeleteConfirmationDialog({
+    required this.contactName,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Warning Icon
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.delete_forever_rounded,
+                size: 40,
+                color: Color(0xFFEF4444),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Title
+            const Text(
+              'Remove Contact?',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Description
+            Text.rich(
+              TextSpan(
+                text: 'Are you sure you want to remove ',
+                children: [
+                  TextSpan(
+                    text: contactName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  const TextSpan(text: ' from your emergency list?'),
+                ],
+              ),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                color: Color(0xFF64748B),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: onConfirm,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: const Color(0xFFEF4444),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Remove',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ADD / EDIT DIALOG - Polished
+// ---------------------------------------------------------------------------
 class _ContactDialog extends StatefulWidget {
   final EmergencyContact? contact;
   final int? index;
@@ -558,9 +627,6 @@ class _ContactDialogState extends State<_ContactDialog> {
   bool _saving = false;
 
   static const primaryColor = Color(0xFF6366F1);
-  static const accentColor = Color(0xFF8B5CF6);
-  static const textPrimaryColor = Color(0xFF1E293B);
-  static const textSecondaryColor = Color(0xFF64748B);
 
   @override
   void initState() {
@@ -581,11 +647,8 @@ class _ContactDialogState extends State<_ContactDialog> {
     final isEdit = widget.contact != null;
 
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
         child: Container(
           padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
@@ -596,18 +659,12 @@ class _ContactDialogState extends State<_ContactDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with icon
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          primaryColor.withOpacity(0.15),
-                          accentColor.withOpacity(0.1),
-                        ],
-                      ),
+                      color: primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -617,79 +674,47 @@ class _ContactDialogState extends State<_ContactDialog> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isEdit ? 'Edit Contact' : 'Add Contact',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: textPrimaryColor,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isEdit
-                              ? 'Update contact details'
-                              : 'Add a trusted person',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: textSecondaryColor,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    isEdit ? 'Edit Contact' : 'New Contact',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E293B),
                     ),
                   ),
                 ],
               ),
-
-              const SizedBox(height: 28),
-
-              // Name field
-              _buildInputLabel('Full Name', required: true),
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
               _buildTextField(
                 controller: nameCtrl,
-                hint: 'Enter contact name',
+                hint: 'Full Name',
                 icon: Icons.person_outline_rounded,
               ),
-
-              const SizedBox(height: 20),
-
-              // Phone field
-              _buildInputLabel('Phone Number', required: true),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               _buildTextField(
                 controller: phoneCtrl,
-                hint: '+1 234 567 8900',
+                hint: 'Phone Number',
                 icon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
               ),
-
               const SizedBox(height: 28),
-
-              // Action buttons
               Row(
                 children: [
                   Expanded(
                     child: TextButton(
-                      onPressed: _saving ? null : () => Navigator.pop(context),
+                      onPressed: () => Navigator.pop(context),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
                         backgroundColor: const Color(0xFFF8FAFC),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Cancel',
                         style: TextStyle(
-                          color: textSecondaryColor,
+                          color: Color(0xFF64748B),
                           fontWeight: FontWeight.w700,
-                          fontSize: 15,
                         ),
                       ),
                     ),
@@ -699,41 +724,27 @@ class _ContactDialogState extends State<_ContactDialog> {
                     child: ElevatedButton(
                       onPressed: _saving ? null : _saveContact,
                       style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        backgroundColor: Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: primaryColor,
                         elevation: 0,
-                        shadowColor: Colors.transparent,
-                      ),
-                      child: Ink(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [primaryColor, accentColor],
-                          ),
-                          borderRadius: BorderRadius.circular(14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child: Container(
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: _saving
-                              ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.5,
-                            ),
-                          )
-                              : Text(
-                            isEdit ? 'Update' : 'Add',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                            ),
-                          ),
+                      ),
+                      child: _saving
+                          ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                          : Text(
+                        isEdit ? 'Save Changes' : 'Add Contact',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -747,73 +758,35 @@ class _ContactDialogState extends State<_ContactDialog> {
     );
   }
 
-  Widget _buildInputLabel(String label, {required bool required}) {
-    return Row(
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: textSecondaryColor.withOpacity(0.7),
-            letterSpacing: 1.2,
-          ),
-        ),
-        if (required) ...[
-          const SizedBox(width: 4),
-          const Text(
-            "*",
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFEF4444),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
     required IconData icon,
     TextInputType? keyboardType,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1.5,
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: const Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+        prefixIcon: Icon(icon, color: const Color(0xFF6366F1), size: 20),
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
-      ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: textPrimaryColor,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: textSecondaryColor.withOpacity(0.4),
-            fontWeight: FontWeight.w500,
-          ),
-          prefixIcon: Icon(
-            icon,
-            color: primaryColor.withOpacity(0.6),
-            size: 20,
-          ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
-          ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
         ),
+        contentPadding: const EdgeInsets.all(20),
       ),
     );
   }
@@ -822,28 +795,13 @@ class _ContactDialogState extends State<_ContactDialog> {
     final name = nameCtrl.text.trim();
     final phone = phoneCtrl.text.trim();
 
-    if (name.isEmpty) {
-      _showError('Please enter contact name');
-      return;
-    }
-
-    if (phone.isEmpty) {
-      _showError('Please enter phone number');
-      return;
-    }
-
-    if (phone.length < 10) {
-      _showError('Please enter a valid phone number');
-      return;
-    }
+    if (name.isEmpty || phone.isEmpty || phone.length < 3) return;
 
     setState(() => _saving = true);
-
     final provider = context.read<ProfileProvider>();
     final contact = EmergencyContact(name: name, phone: phone);
 
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 600));
 
     if (widget.index == null) {
       provider.addContact(contact);
@@ -852,114 +810,41 @@ class _ContactDialogState extends State<_ContactDialog> {
     }
 
     if (!mounted) return;
-
     Navigator.pop(context);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_outline_rounded,
-                color: Colors.white, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                widget.index == null
-                    ? 'Contact added successfully'
-                    : 'Contact updated successfully',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF10B981),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline_rounded,
-                color: Colors.white, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFFEF4444),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
-      ),
-    );
   }
 }
 
 class _EmptyContacts extends StatelessWidget {
-  static const primaryColor = Color(0xFF6366F1);
-  static const textSecondaryColor = Color(0xFF64748B);
-
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Container(
+      child: Padding(
         padding: const EdgeInsets.all(40),
-        margin: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: const Color(0xFFE2E8F0),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.1),
+                color: Colors.white,
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withOpacity(0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-              child: Icon(
-                Icons.people_outline_rounded,
+              child: const Icon(
+                Icons.supervised_user_circle_rounded,
                 size: 64,
-                color: primaryColor,
+                color: Color(0xFF6366F1),
               ),
             ),
             const SizedBox(height: 24),
             const Text(
-              'No Emergency Contacts',
+              'No Contacts Yet',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -967,46 +852,15 @@ class _EmptyContacts extends StatelessWidget {
                 letterSpacing: -0.5,
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Add at least 2 trusted contacts\nfor emergency situations',
+            const SizedBox(height: 8),
+            const Text(
+              'Add at least 2 trusted contacts\nto ensure your safety.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: textSecondaryColor,
+                color: Color(0xFF64748B),
                 fontSize: 14,
-                height: 1.6,
+                height: 1.5,
                 fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 28),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7).withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFFCD34D).withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.info_outline_rounded,
-                    size: 18,
-                    color: Color(0xFFD97706),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    "Tap the + button to add contacts",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: const Color(0xFF92400E),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:safe_track/presentation/screens/privacy_policy_screen.dart';
+import 'package:safe_track/presentation/screens/terms_condition_screen.dart';
 import 'package:safe_track/state/profile_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -410,14 +412,21 @@ class _SettingsScreenState extends State<SettingsScreen>
             icon: Icons.privacy_tip_outlined,
             title: 'Privacy Policy',
             subtitle: 'Data protection info',
-            onTap: () => _openLink('https://your-privacy-policy-link.com'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+            ),
           ),
           _buildDivider(),
           _buildActionTile(
             icon: Icons.description_outlined,
             title: 'Terms of Service',
             subtitle: 'Usage conditions',
-            onTap: () => _openLink('https://your-terms-link.com'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+            ),
+
           ),
         ],
       ),
@@ -794,10 +803,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Future<void> _openLink(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
+  // Future<void> _openLink(String url) async {
+  //   final uri = Uri.parse(url);
+  //   if (await canLaunchUrl(uri)) {
+  //     launchUrl(uri, mode: LaunchMode.externalApplication);
+  //   }
+  // }
 }

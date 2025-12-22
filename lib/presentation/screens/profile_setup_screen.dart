@@ -13,6 +13,7 @@ class ProfileSetUpScreen extends StatefulWidget {
 }
 
 class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
+
   final List<TextEditingController> _nameControllers = [];
   final List<TextEditingController> _phoneControllers = [];
   final TextEditingController _emergencyCallController = TextEditingController();
@@ -41,6 +42,7 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
   }
 
   void _removeContact(int index) {
+
     if (_nameControllers.length <= 2) {
       _showSnackBar("At least 2 emergency contacts are required", isError: true);
       return;
@@ -75,6 +77,8 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
       return;
     }
 
+    debugPrint("_nameController length -> ${_nameControllers.length}");
+
     if (emergencyCall.length < 10) {
       _fail("Please enter a valid emergency number");
       return;
@@ -99,7 +103,10 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
       contacts.add(EmergencyContact(name: cname, phone: phone));
     }
 
+    provider.setEmergencyContacts(contacts);
+
     await provider.setEmergencyCallNumber(emergencyCall);
+
 
     final error = await provider.saveProfileData();
 
@@ -614,7 +621,11 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: IconButton(
-                  onPressed: _addContact,
+                  onPressed: (){
+                    debugPrint(" _nameControllers.length during add..-> ${ _nameControllers.length}");
+                    _addContact();
+                    debugPrint(" _nameControllers.length after add..-> ${ _nameControllers.length}");
+                  },
                   icon: Icon(
                     Icons.add_rounded,
                     color: primaryColor,
@@ -742,7 +753,11 @@ class _ProfileSetUpScreenState extends State<ProfileSetUpScreen> {
                       color: Color(0xFFEF4444),
                       size: 18,
                     ),
-                    onPressed: () => _removeContact(index),
+                    onPressed: (){
+                     debugPrint(" _nameControllers.length during remove..-> ${ _nameControllers.length}");
+                     _removeContact(index);
+                     debugPrint(" _nameControllers.length during remove..-> ${ _nameControllers.length}");
+                      },
                     padding: const EdgeInsets.all(6),
                     constraints: const BoxConstraints(),
                     tooltip: "Remove Contact",

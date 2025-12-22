@@ -1,8 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import 'package:provider/provider.dart';
 import 'package:safe_track/presentation/screens/login_otp_screen.dart';
+import 'package:safe_track/presentation/screens/privacy_policy_screen.dart';
+import 'package:safe_track/presentation/screens/terms_condition_screen.dart';
 import 'package:safe_track/services/auth_services.dart';
 import 'package:safe_track/state/login_provider.dart';
 
@@ -88,9 +91,23 @@ class LoginWidget extends StatefulWidget {
 
 class _LoginWidgetState extends State<LoginWidget> {
 
+  late TapGestureRecognizer _termsRecognizer;
+  late TapGestureRecognizer _privacyRecognizer;
+
+
   @override
   void initState() {
     super.initState();
+
+    _termsRecognizer = TapGestureRecognizer()
+      ..onTap = () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsConditionsScreen()));
+      };
+    _privacyRecognizer = TapGestureRecognizer()
+      ..onTap = () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()));
+      };
+
     // FIX 1: Ensure loading is FALSE when screen first loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -98,6 +115,15 @@ class _LoginWidgetState extends State<LoginWidget> {
       }
     });
   }
+
+  @override
+  void dispose() {
+    _termsRecognizer.dispose();
+    _privacyRecognizer.dispose();
+    super.dispose();
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -484,6 +510,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                           color: primaryColor.withOpacity(0.9),
                           decoration: TextDecoration.underline,
                         ),
+                        recognizer: _termsRecognizer
                       ),
                       const TextSpan(text: " and "),
                       TextSpan(
@@ -493,6 +520,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                           color: primaryColor.withOpacity(0.9),
                           decoration: TextDecoration.underline,
                         ),
+                        recognizer: _privacyRecognizer
                       ),
                     ],
                   ),

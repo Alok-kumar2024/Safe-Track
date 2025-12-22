@@ -16,9 +16,7 @@ class ProfileProvider extends ChangeNotifier {
 
   String? get emergencyCallNumber => _emergencyCallNumber;
 
-
   TextEditingController get nameController => _name;
-
   TextEditingController get emailController => _email;
 
   // ===============================
@@ -27,6 +25,11 @@ class ProfileProvider extends ChangeNotifier {
   List<EmergencyContact> _contacts = [];
 
   List<EmergencyContact> get contacts => _contacts;
+
+  void setEmergencyContacts(List<EmergencyContact> newContacts) {
+    _contacts = newContacts;
+    notifyListeners();
+  }
 
   // ===============================
   // HIVE
@@ -106,15 +109,28 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   Future<void> setEmergencyCallNumber(String number) async {
+    // 1. Update Local & Notify (Optimistic)
     _emergencyCallNumber = number;
-
     if (_isHiveReady) {
       await _userBox.put('emergency_call_number', number);
     }
+    notifyListeners(); // <--- Moved UP so UI updates instantly
 
-    notifyListeners();
+    // 2. Sync to Firestore (Background)
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(user.uid)
+            .set({
+          'emergency_call_number': number,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint("Error syncing emergency number to cloud: $e");
+      }
+    }
   }
-
 
   // ===============================
   // LOAD FROM FIRESTORE
@@ -128,12 +144,11 @@ class ProfileProvider extends ChangeNotifier {
         .map((e) => EmergencyContact.fromMap(Map<String, dynamic>.from(e)))
         .toList();
 
-    _emergencyCallNumber = data['emergency_call_number']; // ✅ ADD
+    _emergencyCallNumber = data['emergency_call_number'];
 
     await _persistToHive();
     notifyListeners();
   }
-
 
   // ===============================
   // SAVE PROFILE (SETUP SCREEN)
@@ -163,7 +178,6 @@ class ProfileProvider extends ChangeNotifier {
         'profileSet': true,
       });
 
-
       return null;
     } catch (e) {
       return 'Failed to save profile';
@@ -171,21 +185,24 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   // ===============================
-  // CONTACT CRUD
+  // CONTACT CRUD (OPTIMIZED FOR OFFLINE)
   // ===============================
   Future<void> addContact(EmergencyContact contact) async {
     _contacts.add(contact);
-    await _persistContacts();
+    notifyListeners(); // ⚡ Update UI IMMEDIATELY
+    await _persistContacts(); // Save in background
   }
 
   Future<void> updateContact(int index, EmergencyContact contact) async {
     _contacts[index] = contact;
-    await _persistContacts();
+    notifyListeners(); // ⚡ Update UI IMMEDIATELY
+    await _persistContacts(); // Save in background
   }
 
   Future<void> deleteContact(int index) async {
     _contacts.removeAt(index);
-    await _persistContacts();
+    notifyListeners(); // ⚡ Update UI IMMEDIATELY
+    await _persistContacts(); // Save in background
   }
 
   // ===============================
@@ -199,19 +216,28 @@ class ProfileProvider extends ChangeNotifier {
   // PERSISTENCE
   // ===============================
   Future<void> _persistContacts() async {
-    await _userBox.put(
-      'emergency_contacts',
-      _contacts.map((e) => e.toMap()).toList(),
-    );
-
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      await FirebaseFirestore.instance.collection('Users').doc(uid).set({
-        'contact_list': _contacts.map((e) => e.toMap()).toList(),
-      }, SetOptions(merge: true));
+    // 1. Save to Hive (Fast local storage)
+    if (_isHiveReady) {
+      await _userBox.put(
+        'emergency_contacts',
+        _contacts.map((e) => e.toMap()).toList(),
+      );
     }
 
-    notifyListeners();
+    // 2. Save to Firestore (Syncs when online)
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        await FirebaseFirestore.instance.collection('Users').doc(uid).set({
+          'contact_list': _contacts.map((e) => e.toMap()).toList(),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint("Error syncing contacts: $e");
+      }
+    }
+
+    // Note: notifyListeners() was removed from here because
+    // we already called it in the CRUD methods above.
   }
 
   Future<void> _persistToHive() async {
